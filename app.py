@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import requests
 import mwparserfromhell
+from urllib.parse import quote
 
 def get_page_history(title, start_date, end_date):
     """
@@ -21,7 +22,7 @@ def get_page_history(title, start_date, end_date):
         "action": "query",
         "format": "json",
         "prop": "revisions",
-        "titles": title,
+        "titles": quote(title),
         "rvprop": "ids|timestamp|content",
         "rvstart": end,
         "rvend": start,
@@ -31,13 +32,22 @@ def get_page_history(title, start_date, end_date):
     revisions = []
     continue_token = None
     
+    st.write(f"Fetching revisions for '{title}' between {start} and {end}")
+    
     while True:
         if continue_token:
             params["rvcontinue"] = continue_token
             
         response = requests.get(api_url, params=params)
+        response.raise_for_status()  # Raise an exception for bad status codes
         data = response.json()
         
+        if 'error' in data:
+            raise Exception(f"Wikipedia API error: {data['error'].get('info', 'Unknown error')}")
+            
+        if 'query' not in data or 'pages' not in data['query']:
+            raise Exception("Unexpected API response format")
+            
         # Extract page data
         pages = data["query"]["pages"]
         page_id = list(pages.keys())[0]
@@ -113,7 +123,7 @@ with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
         "Enter Wikipedia Page Title",
-        "Opioid-induced hyperalgesia",
+        "Python (programming language)",
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     
@@ -177,15 +187,22 @@ if wiki_page:
                 
                 df = pd.DataFrame(edit_data)
                 
-                # Create heatmap using plotly
-                fig = px.density_heatmap(
-                    df,
-                    x='Year',
-                    y='Section',
-                    title='Section Edit Activity',
-                    color_continuous_scale='Reds'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                # Add debug information
+                st.write("Data shape:", df.shape)
+                st.write("Data columns:", df.columns.tolist())
+                
+                if not df.empty:
+                    # Create heatmap using plotly
+                    fig = px.density_heatmap(
+                        df,
+                        x='Year',
+                        y='Section',
+                        title='Section Edit Activity',
+                        color_continuous_scale='Reds'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("No data available for visualization. Try adjusting the date range or check if the Wikipedia page exists.")
 
     except Exception as e:
         st.error(f"Error: {str(e)}")

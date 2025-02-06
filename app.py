@@ -23,10 +23,11 @@ def get_page_history(title, start_date, end_date):
         "format": "json",
         "prop": "revisions",
         "titles": quote(title),
-        "rvprop": "ids|timestamp|content",
+        "rvprop": "ids|timestamp|content|user",
         "rvstart": end,
         "rvend": start,
-        "rvlimit": "max"
+        "rvlimit": "500",
+        "rvslots": "main"
     }
     
     revisions = []
@@ -39,8 +40,9 @@ def get_page_history(title, start_date, end_date):
             params["rvcontinue"] = continue_token
             
         response = requests.get(api_url, params=params)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        st.write("API Response Status:", response.status_code)
         data = response.json()
+        st.write("API Response:", data)
         
         if 'error' in data:
             raise Exception(f"Wikipedia API error: {data['error'].get('info', 'Unknown error')}")
@@ -53,7 +55,10 @@ def get_page_history(title, start_date, end_date):
         page_id = list(pages.keys())[0]
         
         if "revisions" in pages[page_id]:
-            revisions.extend(pages[page_id]["revisions"])
+            for rev in pages[page_id]["revisions"]:
+                if "*" in rev:  # Make sure we have content
+                    revisions.append(rev)
+            st.write(f"Found {len(revisions)} revisions so far")
         
         # Check if there are more revisions to fetch
         if "continue" in data:
@@ -67,20 +72,46 @@ def extract_toc(wikitext):
     """
     Extract table of contents from Wikipedia page content.
     """
-    parsed = mwparserfromhell.parse(wikitext)
-    sections = []
-    
-    for section in parsed.get_sections(include_lead=False, flat=True):
-        heading = section.filter_headings()[0]
-        title = str(heading.title.strip())
-        level = heading.level
+    try:
+        parsed = mwparserfromhell.parse(wikitext)
+        sections = []
         
-        sections.append({
-            "title": title,
-            "level": level
-        })
+        # First try to get sections with the parser
+        for section in parsed.get_sections(include_lead=False, flat=True):
+            try:
+                headings = section.filter_headings()
+                if headings:
+                    heading = headings[0]
+                    title = str(heading.title.strip())
+                    level = heading.level
+                    
+                    sections.append({
+                        "title": title,
+                        "level": level
+                    })
+            except Exception as e:
+                st.write(f"Error processing section: {str(e)}")
+                continue
         
-    return sections
+        # If we found no sections, try a simpler approach
+        if not sections:
+            # Look for common section markers
+            lines = wikitext.split('\n')
+            for line in lines:
+                if line.startswith('==') and line.endswith('=='):
+                    title = line.strip('= ')
+                    level = line.count('=') // 2
+                    sections.append({
+                        "title": title,
+                        "level": level
+                    })
+        
+        st.write(f"Found {len(sections)} sections")
+        return sections
+        
+    except Exception as e:
+        st.write(f"Error parsing wikitext: {str(e)}")
+        return []
 
 def get_toc_history(title, start_date, end_date):
     """
@@ -123,7 +154,7 @@ with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
         "Enter Wikipedia Page Title",
-        "Python (programming language)",
+        "Dog",  # Changed to a simpler example
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     

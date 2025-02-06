@@ -1,0 +1,6 @@
+streamlit>=1.24.0
+pandas>=1.5.3
+requests>=2.31.0
+beautifulsoup4>=4.12.2
+mwparserfromhell>=0.6.4
+plotly>=5.13.1

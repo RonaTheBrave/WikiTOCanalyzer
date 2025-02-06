@@ -2,7 +2,14 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
-from utils.wiki_utils import get_page_history, get_toc_history
+# Change the import to use relative path
+from .utils.wiki_utils import get_page_history, get_toc_history
+import os
+import sys
+
+# Add the current directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 

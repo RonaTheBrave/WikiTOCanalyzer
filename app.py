@@ -192,16 +192,46 @@ if wiki_page:
                             <style>
                                 .stHorizontalBlock {
                                     overflow-x: auto;
-                                    white-space: nowrap;
                                     display: flex;
-                                    gap: 1rem;
-                                    padding: 1rem;
+                                    background: white;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 4px;
+                                    padding: 0;
+                                    margin: 1rem 0;
                                 }
-                                .year-column {
-                                    min-width: 250px;
+                                [data-testid="column"] {
                                     border-right: 1px solid #e5e7eb;
-                                    padding-right: 1rem;
+                                    padding: 1rem !important;
+                                    min-width: 250px;
                                 }
+                                .year-header {
+                                    font-weight: 600;
+                                    padding-bottom: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                    border-bottom: 1px solid #e5e7eb;
+                                }
+                                .section-title {
+                                    padding: 2px 4px;
+                                    margin: 2px 0;
+                                    white-space: normal;
+                                }
+                                .section-new {
+                                    background-color: #dcfce7;
+                                    border-radius: 4px;
+                                }
+                                .section-deleted {
+                                    background-color: #fee2e2;
+                                    border-radius: 4px;
+                                }
+                                .level-indicator {
+                                    color: #9ca3af;
+                                    font-family: monospace;
+                                    font-size: 0.8em;
+                                    opacity: 0.5;
+                                }
+                                .indented-1 { margin-left: 1rem; }
+                                .indented-2 { margin-left: 2rem; }
+                                .indented-3 { margin-left: 3rem; }
                             </style>
                         """, unsafe_allow_html=True)
                         
@@ -211,13 +241,26 @@ if wiki_page:
                         # Fill each column with its year data
                         for idx, (year, sections) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
-                                st.markdown(f"**{year}**")
-                                st.markdown("---")
+                                # Year header
+                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                
+                                # Sections
                                 for section in sections:
-                                    indent = "&nbsp;" * (4 * (section['level'] - 1))
+                                    # Determine section status
+                                    status_class = "section-new" if section.get('isNew') else ""
+                                    status_class = "section-deleted" if section.get('isDeleted') else status_class
+                                    
+                                    # Create indentation class based on level
+                                    indent_class = f"indented-{section['level'] - 1}" if section['level'] > 1 else ""
+                                    
+                                    # Create minimal level indicator (just dots)
+                                    level_indicator = "·" * section['level']
+                                    
                                     st.markdown(
-                                        f"{indent}{section['title']} "
-                                        f"<span style='color:gray;font-family:monospace;'>{'·' * section['level']}</span>",
+                                        f'<div class="section-title {status_class} {indent_class}">'
+                                        f'{section["title"]} '
+                                        f'<span class="level-indicator">{level_indicator}</span>'
+                                        f'</div>',
                                         unsafe_allow_html=True
                                     )
                     

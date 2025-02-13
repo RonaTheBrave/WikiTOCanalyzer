@@ -6,63 +6,60 @@ import requests
 import mwparserfromhell
 from urllib.parse import quote
 
-def get_page_history(title, start_date, end_date):
+def get_page_history(title):
     """
-    Fetch revision history for a Wikipedia page between given dates.
+    Fetch revision history for a Wikipedia page from last 5 years
     """
-    # Format dates for API - use today's date as end and calculate start from there
-    today = datetime.now().date()
-    end = today.strftime("%Y%m%d")
-    start = (today - timedelta(days=365*5)).strftime("%Y%m%d")  # Get 5 years of history
+    # Calculate dates - going back from 2024 instead of using future dates
+    end_date = "20240213"  # Fixed current date in 2024
+    start_date = "20190213"  # 5 years back
     
-    # API endpoint with corrected parameters for content retrieval
     api_url = "https://en.wikipedia.org/w/api.php"
     params = {
         "action": "query",
         "format": "json",
         "prop": "revisions",
         "titles": title,
-        "rvprop": "timestamp|user|comment|content",
-        "rvstart": end,
-        "rvend": start,
-        "rvlimit": "10",
-        "rvdir": "older",
-        "rvslots": "*",
+        "rvprop": "content|timestamp",
+        "rvstart": end_date,
+        "rvend": start_date,
+        "rvlimit": "20",  # Increased limit
+        "rvslots": "main",
         "formatversion": "2"
     }
     
-    st.write("Making API request with parameters:", params)
+    st.write("Making API request for date range:", start_date, "to", end_date)
     
-    revisions = []
     try:
         response = requests.get(api_url, params=params)
         data = response.json()
-        st.write("API Response:", data)  # Debug output
+        st.write("API Response Status:", response.status_code)
         
         if 'query' in data and 'pages' in data['query']:
-            page = data['query']['pages'][0]  # Using formatversion=2
-            if 'revisions' in page:
-                st.write(f"Found {len(page['revisions'])} revisions")
-                revisions = page['revisions']
-                
-                # Print first revision content for debugging
-                if revisions:
-                    first_rev = revisions[0]
-                    st.write("First revision data:", first_rev)  # Debug output
-                    if 'slots' in first_rev and 'main' in first_rev['slots']:
-                        content = first_rev['slots']['main']['content']
-                        st.write("Sample content (first 500 chars):", content[:500])
+            pages = data['query']['pages']
+            if pages and len(pages) > 0:
+                page = pages[0]
+                if 'revisions' in page:
+                    revs = page['revisions']
+                    st.write(f"Successfully retrieved {len(revs)} revisions")
+                    if revs:
+                        # Show sample of first revision content
+                        first_rev = revs[0]
+                        if 'slots' in first_rev and 'main' in first_rev['slots']:
+                            content = first_rev['slots']['main']['content']
+                            st.write("Sample of first revision content:", content[:200])
+                    return revs
+                else:
+                    st.write("Page found but no revisions in response:", page)
             else:
-                st.write("No revisions found in the response")
-                st.write("Full page data:", page)
+                st.write("No pages found in response")
         else:
-            st.write("Unexpected API response format:", data)
+            st.write("Unexpected API response:", data)
             
     except Exception as e:
-        st.error(f"Error making API request: {str(e)}")
-        st.write("Full error details:", e)  # Debug output
+        st.error(f"Error in API request: {str(e)}")
     
-    return revisions
+    return []
 
 def extract_toc(wikitext):
     """
@@ -70,69 +67,51 @@ def extract_toc(wikitext):
     """
     sections = []
     try:
-        # Clean up the wikitext and split into lines
         lines = wikitext.split('\n')
-        
         for line in lines:
             line = line.strip()
             if line.startswith('==') and line.endswith('=='):
-                # Count the equals signs to determine level
-                left_count = 0
-                for char in line:
-                    if char == '=':
-                        left_count += 1
-                    else:
-                        break
-                
                 title = line.strip('=').strip()
-                level = left_count // 2
-                
+                level = (len(line) - len(title)) // 2
                 if title and level > 0:
                     sections.append({
                         "title": title,
                         "level": level
                     })
                     st.write(f"Found section: {title} (level {level})")
-    
     except Exception as e:
-        st.error(f"Error extracting TOC: {str(e)}")
-        st.write("Full error details:", e)  # Debug output
+        st.error(f"Error extracting sections: {str(e)}")
     
+    if sections:
+        st.write(f"Successfully extracted {len(sections)} sections")
     return sections
 
-def get_toc_history(title, start_date, end_date):
+def get_toc_history(title):
     """
     Get table of contents history for a Wikipedia page.
     """
-    revisions = get_page_history(title, start_date, end_date)
+    revisions = get_page_history(title)
     toc_history = {}
     
     for rev in revisions:
         try:
             year = datetime.strptime(rev["timestamp"], "%Y-%m-%dT%H:%M:%SZ").year
-            content = None
             
-            # Extract content from revision
+            # Get content from revision
+            content = None
             if 'slots' in rev and 'main' in rev['slots']:
                 content = rev['slots']['main']['content']
-            elif '*' in rev:
-                content = rev['*']
-                
+            
             if content:
                 sections = extract_toc(content)
-                if sections:  # Only add if we found sections
-                    if str(year) in toc_history:
-                        # Compare with existing sections
-                        existing_sections = {s["title"] for s in toc_history[str(year)]}
-                        for section in sections:
-                            if section["title"] not in existing_sections:
-                                section["isNew"] = True
-                    else:
+                if sections:
+                    # Only store first occurrence for each year
+                    if str(year) not in toc_history:
                         toc_history[str(year)] = sections
+                        st.write(f"Added sections for year {year}")
                         
         except Exception as e:
             st.error(f"Error processing revision: {str(e)}")
-            st.write("Full error details:", e)  # Debug output
             continue
     
     return dict(sorted(toc_history.items()))
@@ -141,7 +120,7 @@ def get_toc_history(title, start_date, end_date):
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
 st.title("Wikipedia TOC History Viewer")
-st.write("This tool shows how the table of contents of a Wikipedia article has evolved over time.")
+st.write("This tool shows the evolution of Wikipedia article table of contents over the past 5 years (2019-2024)")
 
 # Input section
 with st.sidebar:
@@ -151,24 +130,16 @@ with st.sidebar:
         "Dog",
         help="Enter the exact title as it appears in the Wikipedia URL (e.g., 'Python_(programming_language)')"
     )
-    
-    st.write("Note: The tool will show the last 5 years of history from today's date.")
 
 if wiki_page:
     try:
         with st.spinner("Fetching page history..."):
-            # Get TOC history using current date as reference
-            today = datetime.now().date()
-            start_date = today - timedelta(days=365*5)  # 5 years ago
-            end_date = today
-            
-            toc_history = get_toc_history(wiki_page, start_date, end_date)
+            toc_history = get_toc_history(wiki_page)
             
             if not toc_history:
-                st.warning("No table of contents history found for this page and date range.")
+                st.warning("No table of contents history found for this page.")
             else:
-                # Display TOC history
-                st.header("Table of Contents History")
+                st.success(f"Found table of contents history spanning {len(toc_history)} years")
                 
                 # Create tabs for different views
                 tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
@@ -182,9 +153,8 @@ if wiki_page:
                         with col[1]:
                             for section in sections:
                                 indent = "&nbsp;" * (4 * (section['level'] - 1))
-                                status = "🆕 " if section.get('isNew') else ""
                                 st.markdown(
-                                    f"{indent}{status}{section['title']} "
+                                    f"{indent}{section['title']} "
                                     f"<span style='color:gray'>{'*' * section['level']}</span>",
                                     unsafe_allow_html=True
                                 )
@@ -194,24 +164,22 @@ if wiki_page:
                     # Convert data for heatmap
                     edit_data = []
                     for date, sections in toc_history.items():
-                        year = datetime.strptime(date, "%Y").year
+                        year = int(date)
                         for section in sections:
                             edit_data.append({
                                 'Year': year,
                                 'Section': section['title'],
-                                'Level': section['level'],
-                                'Status': 'New' if section.get('isNew') else 'Existing'
+                                'Level': section['level']
                             })
                     
                     df = pd.DataFrame(edit_data)
                     
                     if not df.empty:
-                        # Create heatmap using plotly
                         fig = px.density_heatmap(
                             df,
                             x='Year',
                             y='Section',
-                            title='Section Edit Activity',
+                            title='Section Activity Over Time',
                             color_continuous_scale='Reds'
                         )
                         st.plotly_chart(fig, use_container_width=True)

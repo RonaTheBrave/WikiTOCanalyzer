@@ -86,20 +86,34 @@ def get_page_history(title):
 
 def extract_toc(wikitext):
     """
-    Extract table of contents from Wikipedia page content.
+    Extract table of contents from Wikipedia page content with proper level handling.
     """
     sections = []
+    current_level_stack = []
+    
     try:
         lines = wikitext.split('\n')
         for line in lines:
             line = line.strip()
             if line.startswith('==') and line.endswith('=='):
                 title = line.strip('=').strip()
-                level = (len(line) - len(title)) // 2
-                if title and level > 0:
+                raw_level = (len(line) - len(title)) // 2
+                
+                # Ensure proper level hierarchy
+                if not current_level_stack or raw_level > current_level_stack[-1]:
+                    level = len(current_level_stack) + 1
+                    current_level_stack.append(raw_level)
+                else:
+                    while current_level_stack and raw_level <= current_level_stack[-1]:
+                        current_level_stack.pop()
+                    level = len(current_level_stack) + 1
+                    current_level_stack.append(raw_level)
+                
+                if title:
                     sections.append({
                         "title": title,
-                        "level": level
+                        "level": level,
+                        "raw_level": raw_level
                     })
     except Exception as e:
         st.error(f"Error extracting sections: {str(e)}")
@@ -224,14 +238,14 @@ if wiki_page:
                     )
                     
                     if view_mode == "Timeline View":
-                        # Controls section
+                                                    # Controls section
                         _, controls_col1, controls_col2, controls_col3 = st.columns([3, 1, 1, 1])
                         with controls_col1:
                             zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
                         with controls_col2:
-                            st.button("Fit to Screen", key="unique_fit_btn")
+                            st.button("🔍 Fit", key="unique_fit_btn")
                         with controls_col3:
                             csv_data = []
                             for year, data in sorted(toc_history.items()):
@@ -243,7 +257,7 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "📥",
+                                "⬇️ CSV",
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
@@ -343,6 +357,10 @@ if wiki_page:
                                     <div class="legend-color" style="background-color: #fef3c7;"></div>
                                     <span>Renamed sections</span>
                                 </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: #fee2e2;"></div>
+                                    <span>Sections to be removed</span>
+                                </div>
                             </div>
                         """, unsafe_allow_html=True)
                         
@@ -353,6 +371,7 @@ if wiki_page:
                                 st.markdown(f'<div class="year-header">{year}</div>', 
                                           unsafe_allow_html=True)
                                 
+                                # Display current sections
                                 for section in data["sections"]:
                                     # Calculate indentation and styling
                                     indent = "&nbsp;" * (4 * (section["level"] - 1))
@@ -372,6 +391,17 @@ if wiki_page:
                                             </span>
                                         </div>
                                     """, unsafe_allow_html=True)
+                                
+                                # Display sections to be removed
+                                if "removed" in data:
+                                    for removed_section in data["removed"]:
+                                        st.markdown(f"""
+                                            <div class="section-container">
+                                                <span class="section-title" style="background-color: #fee2e2;">
+                                                    {removed_section}
+                                                </span>
+                                            </div>
+                                        """, unsafe_allow_html=True)
                     
                     elif view_mode == "Edit Activity":
                         st.write("Edit Activity view coming soon!")

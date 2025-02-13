@@ -174,7 +174,6 @@ if wiki_page:
                         with controls_col2:
                             st.button("Fit Screen", key="unique_fit_btn")
                         with controls_col3:
-                        with controls_col3:
                             # Create proper CSV data
                             csv_data = []
                             for year, sections in sorted(toc_history.items()):

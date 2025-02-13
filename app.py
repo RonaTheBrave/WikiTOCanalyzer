@@ -26,9 +26,13 @@ def get_page_history(title, start_date, end_date):
         "rvprop": "content|timestamp",
         "rvstart": end,
         "rvend": start,
-        "rvlimit": "50",  # Changed to 50 as per API limit
-        "formatversion": "2"  # Use newer format version for cleaner response
+        "rvlimit": "1",  # Get one revision per request for testing
+        "formatversion": "2",  # Use newer format version for cleaner response
+        "redirects": "1"  # Follow redirects
     }
+    
+    st.write("API URL:", api_url)
+    st.write("Parameters:", params)
     
     revisions = []
     continue_token = None
@@ -44,12 +48,21 @@ def get_page_history(title, start_date, end_date):
             response.raise_for_status()
             data = response.json()
             
-            # Get the page data
-            if 'query' in data and 'pages' in data['query']:
-                page = data['query']['pages'][0]  # formatversion=2 returns array
-                if 'revisions' in page:
-                    revisions.extend(page['revisions'])
-                    st.write(f"Retrieved {len(page['revisions'])} revisions")
+            st.write("Full API Response:", data)
+            
+            if 'query' in data:
+                if 'pages' in data['query']:
+                    st.write("Found pages in response")
+                    st.write("Page data:", data['query']['pages'])
+                    
+                    page = data['query']['pages'][0]  # formatversion=2 returns array
+                    if 'revisions' in page:
+                        revisions.extend(page['revisions'])
+                        st.write(f"Retrieved {len(page['revisions'])} revisions")
+                else:
+                    st.write("No pages found in response")
+            else:
+                st.write("No query data in response")
             
             # Check for more results
             if 'continue' in data:
@@ -70,31 +83,41 @@ def extract_toc(wikitext):
     """
     sections = []
     try:
+        st.write("Processing wikitext length:", len(wikitext))
+        
         # Simple section extraction using regex pattern
         lines = wikitext.split('\n')
         for line in lines:
-            if line.startswith('==') and line.endswith('=='):
+            # Debug output for potential section lines
+            if '=' in line:
+                st.write("Potential section line:", line)
+            
+            if line.strip().startswith('==') and line.strip().endswith('=='):
                 # Count leading = signs to determine level
                 level_count = 0
-                for char in line:
+                for char in line.strip():
                     if char == '=':
                         level_count += 1
                     else:
                         break
                 
                 # Extract title and remove any remaining = signs
-                title = line.strip('= \t')
+                title = line.strip('= \t\n\r')
                 level = level_count // 2  # Divide by 2 as == is level 1
                 
                 if title and level > 0:
-                    sections.append({
+                    section_data = {
                         "title": title,
                         "level": level
-                    })
+                    }
+                    sections.append(section_data)
+                    st.write("Found section:", section_data)
     
     except Exception as e:
         st.error(f"Error parsing sections: {str(e)}")
+        st.write("Problematic wikitext:", wikitext[:500] + "...")  # Show first 500 chars
     
+    st.write(f"Total sections found: {len(sections)}")
     return sections
 
 def get_toc_history(title, start_date, end_date):

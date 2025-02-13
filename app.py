@@ -187,6 +187,145 @@ if wiki_page:
                     tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
                     
                     with tab1:
+                        # Controls row
+                        controls_col1, controls_col2, controls_col3, controls_col4 = st.columns([1, 1, 1, 3])
+                        
+                        with controls_col1:
+                            zoom_level = st.slider("Zoom", min_value=50, max_value=200, value=100, step=10, 
+                                                 format="%d%%", label_visibility="collapsed")
+                        with controls_col2:
+                            if st.button("Fit to Screen"):
+                                zoom_level = 100
+                        with controls_col3:
+                            if st.button("Download CSV"):
+                                # Create CSV data
+                                csv_data = []
+                                for year, sections in sorted(toc_history.items()):
+                                    for section in sections:
+                                        csv_data.append({
+                                            'Year': year,
+                                            'Section': section['title'],
+                                            'Level': section['level'],
+                                            'Status': 'New' if section.get('isNew') else 'Existing'
+                                        })
+                                df = pd.DataFrame(csv_data)
+                                csv = df.to_csv(index=False)
+                                st.download_button(
+                                    label="Download CSV",
+                                    data=csv,
+                                    file_name="toc_history.csv",
+                                    mime="text/csv",
+                                    key='download-csv'
+                                )
+                        
+                        zoom_scale = zoom_level / 100.0
+                        
+                        # Create container for horizontal scrolling with zoom
+                        st.markdown(f"""
+                            <style>
+                                .scroll-controls {{
+                                    display: flex;
+                                    justify-content: center;
+                                    gap: 1rem;
+                                    margin: 0.5rem 0;
+                                }}
+                                .stHorizontalBlock {{
+                                    overflow-x: auto;
+                                    display: flex;
+                                    background: white;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 4px;
+                                    padding: 0;
+                                    margin: 0.5rem 0;
+                                }}
+                                [data-testid="column"] {{
+                                    border-right: 1px solid #e5e7eb;
+                                    padding: 1rem !important;
+                                    min-width: 300px;
+                                }}
+                                .year-header {{
+                                    font-weight: 600;
+                                    padding-bottom: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    font-size: {14 * zoom_scale}px;
+                                }}
+                                .section-title {{
+                                    padding: 2px 4px;
+                                    margin: 2px 0;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                    position: relative;
+                                    font-size: {13 * zoom_scale}px;
+                                }}
+                                .section-title:hover {{
+                                    white-space: normal;
+                                    background-color: #f3f4f6;
+                                    z-index: 1000;
+                                }}
+                                .section-new {{
+                                    background-color: #dcfce7 !important;
+                                }}
+                                .section-deleted {{
+                                    background-color: #fee2e2 !important;
+                                }}
+                                .hierarchy-line {{
+                                    border-left: 2px solid #e5e7eb;
+                                    position: absolute;
+                                    left: 0;
+                                    top: 0;
+                                    bottom: 0;
+                                }}
+                                .indented-1 {{ padding-left: 1.5rem; }}
+                                .indented-2 {{ padding-left: 3rem; }}
+                                .indented-3 {{ padding-left: 4.5rem; }}
+                                
+                                /* Hide the duplicate timeline */
+                                .element-container:nth-of-type(3) {{
+                                    display: none;
+                                }}
+                            </style>
+                        """, unsafe_allow_html=True)
+                        
+                        # Scroll controls
+                        st.markdown("""
+                            <div class="scroll-controls">
+                                <button onclick="document.querySelector('.stHorizontalBlock').scrollLeft -= 300">←</button>
+                                <button onclick="document.querySelector('.stHorizontalBlock').scrollLeft += 300">→</button>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Create columns for all years
+                        cols = st.columns(len(toc_history))
+                        
+                        # Fill each column with its year data
+                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
+                            with cols[idx]:
+                                # Year header
+                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                
+                                # Sections
+                                for section in sections:
+                                    # Determine section status
+                                    status_class = "section-new" if section.get('isNew') else ""
+                                    
+                                    # Create indentation class based on level
+                                    indent_class = f"indented-{section['level'] - 1}" if section['level'] > 1 else ""
+                                    
+                                    # Create hierarchy lines only for nested sections
+                                    hierarchy_lines = ""
+                                    if section['level'] > 1:
+                                        for i in range(1, section['level']):
+                                            left_position = i * 1.5 - 1.25
+                                            hierarchy_lines += f'<div class="hierarchy-line" style="left: {left_position}rem"></div>'
+                                    
+                                    st.markdown(
+                                        f'<div class="section-title {status_class} {indent_class}" title="{section["title"]}">'
+                                        f'{hierarchy_lines}{section["title"]}'
+                                        f'</div>',
+                                        unsafe_allow_html=True
+                                    )
                         # Add zoom control
                         zoom_level = st.slider("Zoom", min_value=50, max_value=200, value=100, step=10, format="%d%%")
                         zoom_scale = zoom_level / 100.0

@@ -14,80 +14,50 @@ def get_page_history(title, start_date, end_date):
     start = start_date.strftime("%Y%m%d")
     end = end_date.strftime("%Y%m%d")
     
-    # API endpoint
+    # API endpoint with corrected parameters for content retrieval
     api_url = "https://en.wikipedia.org/w/api.php"
-    
-    # Parameters for the API request
     params = {
         "action": "query",
         "format": "json",
         "prop": "revisions",
-        "titles": quote(title),
-        "rvprop": "content|timestamp",
+        "titles": title,
+        "rvprop": "timestamp|user|comment|content",  # Added more properties
         "rvstart": end,
         "rvend": start,
-        "rvlimit": "1",
-        "formatversion": "2",
-        "redirects": "1",
-        "rvslots": "main",
-        "rvdir": "newer"
+        "rvlimit": "10",  # Increased limit
+        "rvdir": "older",
+        "rvslots": "*",
+        "formatversion": "2"
     }
     
-    st.write("API URL:", api_url)
-    st.write("Parameters:", params)
+    st.write("Making API request with parameters:", params)
     
     revisions = []
-    continue_token = None
-    
-    st.write(f"Fetching revisions for '{title}' between {start} and {end}")
-    
-    while True:
-        if continue_token:
-            params["rvcontinue"] = continue_token
+    try:
+        response = requests.get(api_url, params=params)
+        data = response.json()
         
-        try:
-            response = requests.get(api_url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            
-            st.write("Full API Response:", data)
-            
-            if 'query' in data:
-                if 'pages' in data['query']:
-                    pages = data['query']['pages']
-                    st.write("Found pages in response")
-                    st.write("Page data:", pages)
-                    
-                    if pages and len(pages) > 0:
-                        page = pages[0]  # formatversion=2 returns array
-                        if 'revisions' in page:
-                            for rev in page['revisions']:
-                                if 'slots' in rev and 'main' in rev['slots']:
-                                    content = rev['slots']['main']['content']
-                                    st.write(f"Found content of length: {len(content)}")
-                                    rev['content'] = content  # Store content in a standardized way
-                                    revisions.append(rev)
-                                elif '*' in rev:
-                                    content = rev['*']
-                                    st.write(f"Found content of length: {len(content)}")
-                                    revisions.append(rev)
-                            st.write(f"Retrieved {len(page['revisions'])} revisions")
-                else:
-                    st.write("No pages found in response")
-            else:
-                st.write("No query data in response")
-            
-            # Check for more results
-            if 'continue' in data:
-                continue_token = data['continue']['rvcontinue']
-            else:
-                break
+        if 'query' in data and 'pages' in data['query']:
+            page = data['query']['pages'][0]  # Using formatversion=2
+            if 'revisions' in page:
+                st.write(f"Found {len(page['revisions'])} revisions")
+                revisions = page['revisions']
                 
-        except Exception as e:
-            st.error(f"Error fetching revisions: {str(e)}")
-            break
+                # Print first revision content for debugging
+                if revisions:
+                    first_rev = revisions[0]
+                    if 'slots' in first_rev and 'main' in first_rev['slots']:
+                        content = first_rev['slots']['main']['content']
+                        st.write("Sample content (first 500 chars):", content[:500])
+            else:
+                st.write("No revisions found in the response")
+                st.write("Full page data:", page)
+        else:
+            st.write("Unexpected API response format:", data)
+            
+    except Exception as e:
+        st.error(f"Error making API request: {str(e)}")
     
-    st.write(f"Total revisions retrieved: {len(revisions)}")
     return revisions
 
 def extract_toc(wikitext):
@@ -96,37 +66,32 @@ def extract_toc(wikitext):
     """
     sections = []
     try:
-        st.write("Processing wikitext length:", len(wikitext))
-        st.write("First 500 chars of wikitext:", wikitext[:500])
-        
-        # Simple section extraction using regex pattern
+        # Clean up the wikitext and split into lines
         lines = wikitext.split('\n')
-        in_section = False
-        current_section = None
         
         for line in lines:
             line = line.strip()
-            
-            # Look for section headers of various forms
             if line.startswith('==') and line.endswith('=='):
-                # Standard section header
-                raw_title = line.strip('=').strip()
-                level = (len(line) - len(raw_title.strip())) // 2
-                if raw_title and level > 0:
-                    current_section = {
-                        "title": raw_title,
+                # Count the equals signs to determine level
+                left_count = 0
+                for char in line:
+                    if char == '=':
+                        left_count += 1
+                    else:
+                        break
+                
+                title = line.strip('=').strip()
+                level = left_count // 2
+                
+                if title and level > 0:
+                    sections.append({
+                        "title": title,
                         "level": level
-                    }
-                    sections.append(current_section)
-                    st.write(f"Found section: {raw_title} (level {level})")
-            
-            # You could add more section pattern matching here
-            
-        st.write(f"Total sections found: {len(sections)}")
-        
+                    })
+                    st.write(f"Found section: {title} (level {level})")
+    
     except Exception as e:
-        st.error(f"Error parsing sections: {str(e)}")
-        st.write("Problematic wikitext:", wikitext[:500] + "...")
+        st.error(f"Error extracting TOC: {str(e)}")
     
     return sections
 
@@ -134,35 +99,35 @@ def get_toc_history(title, start_date, end_date):
     """
     Get table of contents history for a Wikipedia page.
     """
-    # Get revision history
     revisions = get_page_history(title, start_date, end_date)
-    
-    # Process revisions by year
     toc_history = {}
-    processed_years = set()
     
     for rev in revisions:
-        year = datetime.strptime(rev["timestamp"], "%Y-%m-%dT%H:%M:%SZ").year
-        
-        # Only process one revision per year
-        if year not in processed_years:
-            if 'content' in rev:  # New API format
-                sections = extract_toc(rev["content"])
-            elif '*' in rev:  # Old API format
-                sections = extract_toc(rev["*"])
-            else:
-                continue
-                
-            # Mark new sections by comparing with previous year
-            if toc_history:
-                prev_year = max(toc_history.keys())
-                prev_sections = {s["title"] for s in toc_history[prev_year]}
-                for section in sections:
-                    if section["title"] not in prev_sections:
-                        section["isNew"] = True
+        try:
+            year = datetime.strptime(rev["timestamp"], "%Y-%m-%dT%H:%M:%SZ").year
+            content = None
             
-            toc_history[str(year)] = sections
-            processed_years.add(year)
+            # Extract content from revision
+            if 'slots' in rev and 'main' in rev['slots']:
+                content = rev['slots']['main']['content']
+            elif '*' in rev:
+                content = rev['*']
+                
+            if content:
+                sections = extract_toc(content)
+                if sections:  # Only add if we found sections
+                    if str(year) in toc_history:
+                        # Compare with existing sections
+                        existing_sections = {s["title"] for s in toc_history[str(year)]}
+                        for section in sections:
+                            if section["title"] not in existing_sections:
+                                section["isNew"] = True
+                    else:
+                        toc_history[str(year)] = sections
+                        
+        except Exception as e:
+            st.error(f"Error processing revision: {str(e)}")
+            continue
     
     return dict(sorted(toc_history.items()))
 
@@ -170,6 +135,7 @@ def get_toc_history(title, start_date, end_date):
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
 st.title("Wikipedia TOC History Viewer")
+st.write("This tool shows how the table of contents of a Wikipedia article has evolved over time.")
 
 # Input section
 with st.sidebar:
@@ -177,7 +143,7 @@ with st.sidebar:
     wiki_page = st.text_input(
         "Enter Wikipedia Page Title",
         "Dog",
-        help="Enter the exact title as it appears in the Wikipedia URL"
+        help="Enter the exact title as it appears in the Wikipedia URL (e.g., 'Python_(programming_language)')"
     )
     
     end_date = st.date_input(
@@ -243,10 +209,6 @@ if wiki_page:
                     
                     df = pd.DataFrame(edit_data)
                     
-                    # Add debug information
-                    st.write("Data shape:", df.shape)
-                    st.write("Data columns:", df.columns.tolist())
-                    
                     if not df.empty:
                         # Create heatmap using plotly
                         fig = px.density_heatmap(
@@ -258,7 +220,7 @@ if wiki_page:
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
-                        st.warning("No data available for visualization. Try adjusting the date range or check if the Wikipedia page exists.")
+                        st.warning("No data available for visualization.")
 
     except Exception as e:
         st.error(f"Error: {str(e)}")

@@ -119,43 +119,76 @@ def extract_toc(wikitext):
         st.error(f"Error extracting sections: {str(e)}")
     return sections
 
+def detect_renamed_sections(prev_sections, curr_sections):
+    """
+    Detect renamed sections using similarity metrics
+    """
+    from difflib import SequenceMatcher
+    
+    def similarity(a, b):
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    
+    renamed_sections = {}
+    for old_section in prev_sections:
+        if old_section not in curr_sections:
+            # Look for potential renamed matches
+            for new_section in curr_sections:
+                if new_section not in prev_sections:
+                    sim_score = similarity(old_section, new_section)
+                    if sim_score > 0.8:  # High similarity threshold
+                        renamed_sections[new_section] = old_section
+    
+    return renamed_sections
+
 def process_revision_history(title):
     """
-    Process revision history and extract TOC for each year
+    Process revision history and extract TOC with rename detection
     """
     revisions = get_page_history(title)
     
     yearly_revisions = {}
     years_processed = set()
     previous_sections = set()
+    previous_data = None
     
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
         
         if year not in years_processed and year >= 2019:
-            yearly_revisions[year] = rev['revid']
-            years_processed.add(year)
+            content = get_revision_content(title, rev['revid'])
+            if content:
+                sections = extract_toc(content)
+                current_sections = {s["title"] for s in sections}
+                
+                # Detect renames if we have previous data
+                renamed_sections = {}
+                if previous_data:
+                    renamed_sections = detect_renamed_sections(
+                        previous_sections,
+                        current_sections
+                    )
+                
+                # Mark new and renamed sections
+                for section in sections:
+                    if section["title"] not in previous_sections:
+                        if section["title"] in renamed_sections:
+                            section["isRenamed"] = True
+                            section["previousTitle"] = renamed_sections[section["title"]]
+                        else:
+                            section["isNew"] = True
+                
+                data = {
+                    "sections": sections,
+                    "removed": previous_sections - current_sections - set(renamed_sections.values()),
+                    "renamed": renamed_sections
+                }
+                
+                yearly_revisions[str(year)] = data
+                previous_sections = current_sections
+                previous_data = data
+                years_processed.add(year)
     
-    toc_history = {}
-    for year, revid in sorted(yearly_revisions.items()):
-        content = get_revision_content(title, revid)
-        if content:
-            sections = extract_toc(content)
-            
-            # Track new and renamed sections
-            current_sections = {s["title"] for s in sections}
-            for section in sections:
-                if section["title"] not in previous_sections:
-                    section["isNew"] = True
-            
-            toc_history[str(year)] = {
-                "sections": sections,
-                "removed": previous_sections - current_sections
-            }
-            
-            previous_sections = current_sections
-    
-    return toc_history
+    return yearly_revisions
 
 def create_section_count_chart(toc_history):
     """
@@ -245,7 +278,7 @@ if wiki_page:
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
                         with controls_col2:
-                            st.button("🔍 Fit", key="unique_fit_btn")
+                            st.button("⟲", key="unique_fit_btn")  # Simple reset/fit icon
                         with controls_col3:
                             csv_data = []
                             for year, data in sorted(toc_history.items()):
@@ -257,7 +290,7 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "⬇️ CSV",
+                                "↓",  # Simple download arrow
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",

@@ -121,7 +121,7 @@ def extract_toc(wikitext):
 
 def detect_renamed_sections(prev_sections, curr_sections):
     """
-    Detect renamed sections using similarity metrics
+    Detect renamed sections using similarity metrics with lower threshold
     """
     from difflib import SequenceMatcher
     
@@ -129,14 +129,21 @@ def detect_renamed_sections(prev_sections, curr_sections):
         return SequenceMatcher(None, a.lower(), b.lower()).ratio()
     
     renamed_sections = {}
-    for old_section in prev_sections:
-        if old_section not in curr_sections:
-            # Look for potential renamed matches
-            for new_section in curr_sections:
-                if new_section not in prev_sections:
-                    sim_score = similarity(old_section, new_section)
-                    if sim_score > 0.8:  # High similarity threshold
-                        renamed_sections[new_section] = old_section
+    removed_sections = prev_sections - curr_sections
+    added_sections = curr_sections - prev_sections
+    
+    for old_section in removed_sections:
+        best_match = None
+        best_score = 0
+        for new_section in added_sections:
+            sim_score = similarity(old_section, new_section)
+            if sim_score > 0.6 and sim_score > best_score:  # Lower threshold, but take best match
+                best_score = sim_score
+                best_match = new_section
+        
+        if best_match:
+            renamed_sections[best_match] = old_section
+            print(f"Found rename: {old_section} -> {best_match} (score: {best_score})")
     
     return renamed_sections
 
@@ -148,8 +155,7 @@ def process_revision_history(title):
     
     yearly_revisions = {}
     years_processed = set()
-    previous_sections = set()
-    previous_data = None
+    previous_sections = None
     
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -162,30 +168,31 @@ def process_revision_history(title):
                 
                 # Detect renames if we have previous data
                 renamed_sections = {}
-                if previous_data:
-                    renamed_sections = detect_renamed_sections(
-                        previous_sections,
-                        current_sections
-                    )
+                removed_sections = set()
+                if previous_sections is not None:
+                    renamed_sections = detect_renamed_sections(previous_sections, current_sections)
+                    # Only include truly removed sections (not renamed ones)
+                    removed_sections = previous_sections - current_sections - set(renamed_sections.values())
                 
                 # Mark new and renamed sections
                 for section in sections:
-                    if section["title"] not in previous_sections:
-                        if section["title"] in renamed_sections:
+                    section_title = section["title"]
+                    if previous_sections is None or section_title not in previous_sections:
+                        if section_title in renamed_sections:
                             section["isRenamed"] = True
-                            section["previousTitle"] = renamed_sections[section["title"]]
+                            section["previousTitle"] = renamed_sections[section_title]
+                            print(f"Marking section as renamed: {section_title} (was {renamed_sections[section_title]})")
                         else:
                             section["isNew"] = True
                 
                 data = {
                     "sections": sections,
-                    "removed": previous_sections - current_sections - set(renamed_sections.values()),
+                    "removed": removed_sections,
                     "renamed": renamed_sections
                 }
                 
                 yearly_revisions[str(year)] = data
                 previous_sections = current_sections
-                previous_data = data
                 years_processed.add(year)
     
     return yearly_revisions
@@ -272,14 +279,14 @@ if wiki_page:
                     
                     if view_mode == "Timeline View":
                                                     # Controls section
-                        _, controls_col1, controls_col2, controls_col3 = st.columns([3, 1, 1, 1])
-                        with controls_col1:
+                        cols = st.columns([6, 1])  # Using fewer columns to group controls together
+                        with cols[0]:
                             zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
-                        with controls_col2:
-                            st.button("⟲", key="unique_fit_btn")  # Simple reset/fit icon
-                        with controls_col3:
+                        with cols[1]:
+                            st.write('<div style="display: flex; gap: 4px; justify-content: flex-end;">', unsafe_allow_html=True)
+                            st.button("⟲", key="unique_fit_btn")
                             csv_data = []
                             for year, data in sorted(toc_history.items()):
                                 for section in data["sections"]:
@@ -290,13 +297,14 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "↓",  # Simple download arrow
+                                "↓",
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
                                 key="unique_download_btn",
                                 help="Download data as CSV"
                             )
+                            st.write('</div>', unsafe_allow_html=True)
                         
                         # Custom styling
                         st.markdown(f"""

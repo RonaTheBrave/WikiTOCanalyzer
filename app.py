@@ -187,6 +187,162 @@ if wiki_page:
                     tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
                     
                     with tab1:
+                        # Controls row with compact styling
+                        st.markdown("""
+                            <style>
+                                .controls-row { padding: 0.5rem 0; }
+                                [data-testid="stSlider"] { 
+                                    padding: 0 1rem;
+                                    width: 150px;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
+                        
+                        controls_col1, controls_col2, controls_col3, controls_col4 = st.columns([2, 1, 1, 3])
+                        
+                        with controls_col1:
+                            zoom_level = st.slider(
+                                "Zoom",
+                                min_value=50,
+                                max_value=200,
+                                value=100,
+                                step=10,
+                                format="%d%%",
+                                key="zoom_slider_unique"  # Added unique key
+                            )
+                        with controls_col2:
+                            if st.button("Fit Screen", key="fit_screen_btn"):
+                                zoom_level = 100
+                        with controls_col3:
+                            if st.button("Download CSV", key="download_btn"):
+                                csv_data = []
+                                for year, sections in sorted(toc_history.items()):
+                                    for section in sections:
+                                        csv_data.append({
+                                            'Year': year,
+                                            'Section': section['title'],
+                                            'Level': section['level'],
+                                            'Status': 'New' if section.get('isNew') else 'Existing'
+                                        })
+                                df = pd.DataFrame(csv_data)
+                                csv = df.to_csv(index=False)
+                                st.download_button(
+                                    label="Download CSV",
+                                    data=csv,
+                                    file_name="toc_history.csv",
+                                    mime="text/csv",
+                                    key='download_csv_btn'
+                                )
+                        
+                        zoom_scale = zoom_level / 100.0
+                        
+                        # Create container for horizontal scrolling with zoom
+                        st.markdown(f"""
+                            <style>
+                                .timeline-container {{
+                                    overflow-x: auto;
+                                    background: white;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 4px;
+                                    margin: 0.5rem 0;
+                                }}
+                                .year-column {{
+                                    display: inline-block;
+                                    vertical-align: top;
+                                    border-right: 1px solid #e5e7eb;
+                                    padding: 1rem;
+                                    min-width: 300px;
+                                }}
+                                .year-header {{
+                                    font-weight: 600;
+                                    padding-bottom: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                    border-bottom: 1px solid #e5e7eb;
+                                    font-size: {14 * zoom_scale}px;
+                                }}
+                                .section-container {{
+                                    position: relative;
+                                }}
+                                .section-title {{
+                                    padding: 2px 4px;
+                                    margin: 2px 0;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                    font-size: {13 * zoom_scale}px;
+                                    border-radius: 4px;
+                                }}
+                                .section-title:hover {{
+                                    white-space: normal;
+                                    background-color: #f3f4f6;
+                                    z-index: 1000;
+                                }}
+                                .section-new {{
+                                    background-color: rgb(220, 252, 231) !important;
+                                }}
+                                .section-deleted {{
+                                    background-color: rgb(254, 226, 226) !important;
+                                }}
+                                .hierarchy-line {{
+                                    position: absolute;
+                                    top: 0;
+                                    bottom: 0;
+                                    width: 1px;
+                                    background-color: #e5e7eb;
+                                }}
+                                .indented-1 {{ margin-left: 1.5rem; }}
+                                .indented-2 {{ margin-left: 3rem; }}
+                                .indented-3 {{ margin-left: 4.5rem; }}
+                            </style>
+                            
+                            <div class="timeline-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # Build the timeline HTML
+                        timeline_html = ""
+                        for year, sections in sorted(toc_history.items()):
+                            timeline_html += f'<div class="year-column"><div class="year-header">{year}</div>'
+                            
+                            for section in sections:
+                                # Determine classes
+                                classes = ['section-title']
+                                if section.get('isNew'):
+                                    classes.append('section-new')
+                                if section.get('isDeleted'):
+                                    classes.append('section-deleted')
+                                if section['level'] > 1:
+                                    classes.append(f'indented-{section["level"] - 1}')
+                                
+                                # Create hierarchy lines for nested sections
+                                hierarchy_lines = ""
+                                if section['level'] > 1:
+                                    for i in range(1, section['level']):
+                                        left_pos = i * 1.5 - 0.1
+                                        hierarchy_lines += f'<div class="hierarchy-line" style="left: {left_pos}rem"></div>'
+                                
+                                timeline_html += f"""
+                                    <div class="section-container">
+                                        {hierarchy_lines}
+                                        <div class="{' '.join(classes)}" title="{section['title']}">
+                                            {section['title']}
+                                        </div>
+                                    </div>
+                                """
+                            
+                            timeline_html += '</div>'
+                        
+                        # Close the container and add scroll controls
+                        st.markdown(timeline_html + '</div>', unsafe_allow_html=True)
+                        
+                        # Scroll controls
+                        st.markdown("""
+                            <div style="text-align: center; padding: 0.5rem;">
+                                <button onclick="document.querySelector('.timeline-container').scrollLeft -= 300"
+                                        style="margin: 0 0.5rem;">←</button>
+                                <button onclick="document.querySelector('.timeline-container').scrollLeft += 300"
+                                        style="margin: 0 0.5rem;">→</button>
+                            </div>
+                        """, unsafe_allow_html=True)
                         # Controls row
                         controls_col1, controls_col2, controls_col3, controls_col4 = st.columns([1, 1, 1, 3])
                         

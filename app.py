@@ -174,49 +174,60 @@ if wiki_page:
                         with controls_col2:
                             st.button("Fit Screen", key="unique_fit_btn")
                         with controls_col3:
+                        with controls_col3:
+                            # Create proper CSV data
+                            csv_data = []
+                            for year, sections in sorted(toc_history.items()):
+                                for section in sections:
+                                    csv_data.append({
+                                        'Year': year,
+                                        'Section': section['title'],
+                                        'Level': section['level']
+                                    })
+                            csv_df = pd.DataFrame(csv_data)
                             st.download_button(
                                 "Download CSV",
-                                data=pd.DataFrame(toc_history).to_csv(),
+                                data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
                                 key="unique_download_btn"
                             )
                         
                         # Timeline view styling
-                        st.markdown(f"""
+                        st.markdown("""
                             <style>
-                                .stHorizontalBlock {{
+                                .stHorizontalBlock {
                                     overflow-x: auto;
-                                }}
-                                [data-testid="column"] {{
-                                    border-right: 1px solid #e5e7eb;
-                                    padding: 1rem !important;
-                                    min-width: 300px;
-                                }}
-                                .section-title {{
+                                    padding: 1rem;
+                                    background: white;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 4px;
+                                }
+                                .section-title {
                                     padding: 2px 4px;
                                     margin: 2px 0;
+                                    white-space: nowrap;
                                     overflow: hidden;
                                     text-overflow: ellipsis;
-                                    font-size: {13 * zoom_level/100}px;
-                                }}
-                                .section-new {{
+                                }
+                                .section-new {
                                     background-color: #dcfce7;
-                                }}
+                                }
                             </style>
                         """, unsafe_allow_html=True)
                         
                         # Create columns for each year
                         cols = st.columns(len(toc_history))
+                        
+                        # Display content in columns
                         for idx, (year, sections) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
                                 st.markdown(f"### {year}")
+                                st.markdown("---")
                                 for section in sections:
-                                    level = section['level']
-                                    indent = "&nbsp;" * (4 * (level - 1))
+                                    indent = "&nbsp;" * (4 * (section['level'] - 1))
                                     st.markdown(
-                                        f'<div class="section-title" style="margin-left: {level * 20}px">'
-                                        f'{section["title"]}</div>',
+                                        f"{indent}{section['title']}",
                                         unsafe_allow_html=True
                                     )
                     

@@ -52,32 +52,45 @@ def get_page_history(title):
         "prop": "revisions",
         "titles": title,
         "rvprop": "ids|timestamp",
-        "rvlimit": "500",  # Get maximum allowed revisions
-        "formatversion": "2"
+        "rvlimit": "500",
+        "formatversion": "2",
+        "continue": "",
+        "rvdir": "older"  # Get older revisions first
     }
     
     st.write("Fetching revision history...")
-    st.write("Parameters:", params)
     
-    try:
-        response = requests.get(api_url, params=params)
-        data = response.json()
+    all_revisions = []
+    continue_data = {}
+    
+    while True:
+        # Add continue data if it exists
+        request_params = {**params, **continue_data}
+        st.write("Making API request with parameters:", request_params)
         
-        st.write("Response Status:", response.status_code)
-        
-        if 'query' in data and 'pages' in data['query']:
-            page = data['query']['pages'][0]
-            if 'revisions' in page:
-                revisions = page['revisions']
-                st.write(f"Found {len(revisions)} revisions")
-                return revisions
-        
-        st.write("Full Response:", data)
-        return []
+        try:
+            response = requests.get(api_url, params=request_params)
+            data = response.json()
             
-    except Exception as e:
-        st.error(f"Error fetching history: {str(e)}")
-        return []
+            if 'query' in data and 'pages' in data['query']:
+                page = data['query']['pages'][0]
+                if 'revisions' in page:
+                    all_revisions.extend(page['revisions'])
+                    st.write(f"Retrieved {len(page['revisions'])} revisions (Total: {len(all_revisions)})")
+            
+            # Check if there are more revisions to fetch
+            if 'continue' in data:
+                continue_data = data['continue']
+                st.write("More revisions available, continuing...")
+            else:
+                break
+                
+        except Exception as e:
+            st.error(f"Error fetching revisions: {str(e)}")
+            break
+    
+    st.write(f"Total revisions retrieved: {len(all_revisions)}")
+    return all_revisions
 
 def extract_toc(wikitext):
     """
@@ -108,18 +121,25 @@ def process_revision_history(title):
     
     # Group revisions by year
     yearly_revisions = {}
-    for rev in revisions:
+    years_processed = set()
+    current_year = datetime.now().year
+    
+    st.write("Processing revisions by year...")
+    
+    # Process revisions in chronological order
+    for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
-        revid = rev['revid']
         
-        # Store revision if it's the first one we've seen for this year
-        if year not in yearly_revisions:
-            yearly_revisions[year] = revid
-            st.write(f"Found revision for year {year}: {revid}")
+        # Only process years we haven't seen yet and stop at 2019
+        if year not in years_processed and year >= 2019:
+            yearly_revisions[year] = rev['revid']
+            years_processed.add(year)
+            st.write(f"Found revision for year {year}: {rev['revid']}")
     
-    st.write(f"Found revisions for years: {sorted(yearly_revisions.keys())}")
+    years_found = sorted(yearly_revisions.keys())
+    st.write(f"Found revisions for years: {years_found}")
     
-    # Get TOC for each year's first revision
+    # Get TOC for each year's revision
     toc_history = {}
     for year, revid in sorted(yearly_revisions.items()):
         st.write(f"Processing year {year} (revision {revid})")

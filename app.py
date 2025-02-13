@@ -157,6 +157,9 @@ def process_revision_history(title):
     years_processed = set()
     previous_sections = None
     
+    # Debug output
+    st.write("Processing revisions for rename detection...")
+    
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
         
@@ -166,11 +169,17 @@ def process_revision_history(title):
                 sections = extract_toc(content)
                 current_sections = {s["title"] for s in sections}
                 
+                # Debug output
+                st.write(f"Year {year} sections:", current_sections)
+                
                 # Detect renames if we have previous data
                 renamed_sections = {}
                 removed_sections = set()
                 if previous_sections is not None:
+                    st.write(f"Checking for renames between {year-1} and {year}")
                     renamed_sections = detect_renamed_sections(previous_sections, current_sections)
+                    if renamed_sections:
+                        st.write("Found renames:", renamed_sections)
                     # Only include truly removed sections (not renamed ones)
                     removed_sections = previous_sections - current_sections - set(renamed_sections.values())
                 
@@ -181,7 +190,7 @@ def process_revision_history(title):
                         if section_title in renamed_sections:
                             section["isRenamed"] = True
                             section["previousTitle"] = renamed_sections[section_title]
-                            print(f"Marking section as renamed: {section_title} (was {renamed_sections[section_title]})")
+                            st.write(f"Marked as renamed: {section_title} (was {renamed_sections[section_title]})")
                         else:
                             section["isNew"] = True
                 
@@ -279,13 +288,12 @@ if wiki_page:
                     
                     if view_mode == "Timeline View":
                                                     # Controls section
-                        cols = st.columns([6, 1])  # Using fewer columns to group controls together
-                        with cols[0]:
+                        cols = st.columns([4, 2])  # Making zoom control smaller
+                        with cols[1]:  # Right-aligned controls
+                            st.write('<div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">', unsafe_allow_html=True)
                             zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
-                        with cols[1]:
-                            st.write('<div style="display: flex; gap: 4px; justify-content: flex-end;">', unsafe_allow_html=True)
                             st.button("⟲", key="unique_fit_btn")
                             csv_data = []
                             for year, data in sorted(toc_history.items()):

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 
 def get_revision_content(title, revid=None):
@@ -49,10 +50,9 @@ def get_page_history(title):
         "format": "json",
         "prop": "revisions",
         "titles": title,
-        "rvprop": "ids|timestamp",
+        "rvprop": "ids|timestamp|content",
         "rvlimit": "500",
         "formatversion": "2",
-        "continue": "",
         "rvdir": "older"
     }
     
@@ -113,6 +113,7 @@ def process_revision_history(title):
     
     yearly_revisions = {}
     years_processed = set()
+    previous_sections = set()
     
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -126,10 +127,60 @@ def process_revision_history(title):
         content = get_revision_content(title, revid)
         if content:
             sections = extract_toc(content)
-            if sections:
-                toc_history[str(year)] = sections
+            
+            # Track new and renamed sections
+            current_sections = {s["title"] for s in sections}
+            for section in sections:
+                if section["title"] not in previous_sections:
+                    section["isNew"] = True
+            
+            toc_history[str(year)] = {
+                "sections": sections,
+                "removed": previous_sections - current_sections
+            }
+            
+            previous_sections = current_sections
     
     return toc_history
+
+def create_section_count_chart(toc_history):
+    """
+    Create section count visualization
+    """
+    counts = []
+    for year, data in sorted(toc_history.items()):
+        total = len(data["sections"])
+        new = len([s for s in data["sections"] if s.get("isNew", True)])
+        counts.append({
+            "Year": year,
+            "Total Sections": total,
+            "New Sections": new
+        })
+    
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[c["Year"] for c in counts],
+        y=[c["Total Sections"] for c in counts],
+        name="Total Sections",
+        marker_color='rgb(55, 83, 109)'
+    ))
+    fig.add_trace(go.Bar(
+        x=[c["Year"] for c in counts],
+        y=[c["New Sections"] for c in counts],
+        name="New Sections",
+        marker_color='rgb(26, 118, 255)'
+    ))
+    
+    fig.update_layout(
+        title="Section Count Evolution",
+        xaxis_title="Year",
+        yaxis_title="Number of Sections",
+        barmode='group',
+        bargap=0.15,
+        bargroupgap=0.1
+    )
+    
+    return fig
 
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
@@ -145,6 +196,9 @@ with st.sidebar:
         "Opioid-induced hyperalgesia",
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
+    
+    show_renames = st.toggle("Enable Rename Detection", True,
+                           help="When enabled, detects and highlights sections that were renamed")
 
 if wiki_page:
     try:
@@ -161,11 +215,16 @@ if wiki_page:
                 if toc_history:
                     st.success(f"Found historical versions from {len(toc_history)} different years")
                     
-                    # Create tabs for different views
-                    tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
+                    # View mode selection
+                    view_mode = st.radio(
+                        "View Mode",
+                        ["Timeline View", "Edit Activity", "Section Count"],
+                        horizontal=True,
+                        key="view_mode"
+                    )
                     
-                    with tab1:
-                        # Move controls to the right
+                    if view_mode == "Timeline View":
+                        # Controls section
                         _, controls_col1, controls_col2, controls_col3 = st.columns([3, 1, 1, 1])
                         with controls_col1:
                             zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
@@ -175,8 +234,8 @@ if wiki_page:
                             st.button("Fit to Screen", key="unique_fit_btn")
                         with controls_col3:
                             csv_data = []
-                            for year, sections in sorted(toc_history.items()):
-                                for section in sections:
+                            for year, data in sorted(toc_history.items()):
+                                for section in data["sections"]:
                                     csv_data.append({
                                         'Year': year,
                                         'Section': section['title'],
@@ -184,7 +243,7 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "📥",  # Using a more elegant download icon
+                                "📥",
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
@@ -192,7 +251,7 @@ if wiki_page:
                                 help="Download data as CSV"
                             )
                         
-                        # Timeline view styling
+                        # Custom styling
                         st.markdown(f"""
                             <style>
                                 .stHorizontalBlock {{
@@ -214,6 +273,10 @@ if wiki_page:
                                     padding-bottom: 0.5rem;
                                     border-bottom: 1px solid #e5e7eb;
                                     text-align: center;
+                                    position: sticky;
+                                    top: 0;
+                                    background: white;
+                                    z-index: 10;
                                 }}
                                 .section-container {{
                                     position: relative;
@@ -238,6 +301,9 @@ if wiki_page:
                                 .section-new {{
                                     background-color: #dcfce7 !important;
                                 }}
+                                .section-renamed {{
+                                    background-color: #fef3c7 !important;
+                                }}
                                 .vertical-line {{
                                     position: absolute;
                                     left: 12px;
@@ -247,108 +313,74 @@ if wiki_page:
                                     background-color: #e5e7eb;
                                     z-index: 1;
                                 }}
-                                /* Style for buttons */
-                                .stButton button {{
-                                    padding: 0.25rem 0.5rem;
+                                .legend {{
+                                    display: flex;
+                                    gap: 1rem;
+                                    margin-bottom: 1rem;
                                     font-size: 0.875rem;
-                                    border: 1px solid #e5e7eb;
-                                    background-color: white;
-                                    border-radius: 4px;
+                                }}
+                                .legend-item {{
                                     display: flex;
                                     align-items: center;
-                                    justify-content: center;
+                                    gap: 0.5rem;
                                 }}
-                                .stButton button:hover {{
-                                    background-color: #f3f4f6;
+                                .legend-color {{
+                                    width: 12px;
+                                    height: 12px;
+                                    border-radius: 3px;
                                 }}
                             </style>
                         """, unsafe_allow_html=True)
                         
-                        # Create columns for each year
+                        # Add legend
+                        st.markdown("""
+                            <div class="legend">
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: #dcfce7;"></div>
+                                    <span>New sections</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background-color: #fef3c7;"></div>
+                                    <span>Renamed sections</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Create columns for timeline view
                         cols = st.columns(len(toc_history))
-                        
-                        # Display content in columns
-                        prev_year_sections = set()  # Track sections from previous year
-                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
+                        for idx, (year, data) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
-                                # Year header centered
-                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="year-header">{year}</div>', 
+                                          unsafe_allow_html=True)
                                 
-                                # Get current year's section titles
-                                current_sections = {s["title"] for s in sections}
-                                
-                                # Process sections
-                                for section in sections:
-                                    level = section['level']
+                                for section in data["sections"]:
+                                    # Calculate indentation and styling
+                                    indent = "&nbsp;" * (4 * (section["level"] - 1))
+                                    classes = []
+                                    if section.get("isNew"):
+                                        classes.append("section-new")
+                                    if show_renames and section.get("isRenamed"):
+                                        classes.append("section-renamed")
                                     
-                                    # Check if section is new
-                                    section['isNew'] = section['title'] not in prev_year_sections
+                                    class_str = " ".join(classes)
                                     
-                                    # Create vertical lines only for nested sections (level > 1)
-                                    hierarchy_lines = ""
-                                    if level > 1:
-                                        hierarchy_lines = '<div class="vertical-line"></div>'
-                                    
-                                    # Add class for new sections
-                                    section_class = "section-new" if section.get('isNew') else ""
-                                    indent_style = f"margin-left: {(level-1) * 20}px" if level > 1 else ""
-                                    
-                                    st.markdown(
-                                        f'<div class="section-container" style="{indent_style}">'
-                                        f'{hierarchy_lines}'
-                                        f'<div class="section-title {section_class}" title="{section["title"]}">'
-                                        f'{section["title"]}'
-                                        f'</div></div>',
-                                        unsafe_allow_html=True
-                                    )
-                                
-                                # Update previous year's sections
-                                prev_year_sections = current_sections
-                        
-                        # Create columns for each year
-                        cols = st.columns(len(toc_history))
-                        
-                        # Display content in columns
-                        prev_year_sections = set()  # Track sections from previous year
-                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
-                            with cols[idx]:
-                                # Year header
-                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
-                                
-                                # Get current year's section titles
-                                current_sections = {s["title"] for s in sections}
-                                
-                                # Process sections
-                                for section in sections:
-                                    level = section['level']
-                                    
-                                    # Check if section is new (not in previous year)
-                                    section['isNew'] = section['title'] not in prev_year_sections
-                                    
-                                    # Create vertical lines for hierarchy
-                                    hierarchy_lines = ""
-                                    if level > 1:
-                                        hierarchy_lines = '<div class="vertical-line"></div>'
-                                    
-                                    # Add class for new sections
-                                    section_class = "section-new" if section.get('isNew') else ""
-                                    indent_style = f"margin-left: {(level-1) * 20}px"
-                                    
-                                    st.markdown(
-                                        f'<div class="section-container" style="{indent_style}">'
-                                        f'{hierarchy_lines}'
-                                        f'<div class="section-title {section_class}" title="{section["title"]}">'
-                                        f'{section["title"]}'
-                                        f'</div></div>',
-                                        unsafe_allow_html=True
-                                    )
-                                
-                                # Update previous year's sections for next iteration
-                                prev_year_sections = current_sections
+                                    # Display section with proper styling
+                                    st.markdown(f"""
+                                        <div class="section-container">
+                                            {indent}<span class="section-title {class_str}">
+                                                {section["title"]}
+                                            </span>
+                                        </div>
+                                    """, unsafe_allow_html=True)
                     
-                    with tab2:
-                        # Edit Activity view code here...
-                        pass
+                    elif view_mode == "Edit Activity":
+                        st.write("Edit Activity view coming soon!")
+                        # TODO: Implement edit activity heatmap
+                    
+                    elif view_mode == "Section Count":
+                        fig = create_section_count_chart(toc_history)
+                        st.plotly_chart(fig, use_container_width=True)
+                
                 else:
                     st.warning("No historical versions found.")
             else:

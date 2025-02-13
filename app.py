@@ -187,82 +187,39 @@ if wiki_page:
                     tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
                     
                     with tab1:
-                        # Create CSS for horizontal layout
+                        # Create container for horizontal scrolling
                         st.markdown("""
                             <style>
-                                .horizontal-scroll {
+                                .stHorizontalBlock {
                                     overflow-x: auto;
                                     white-space: nowrap;
+                                    display: flex;
+                                    gap: 1rem;
                                     padding: 1rem;
-                                    background: white;
-                                    border-radius: 4px;
-                                    border: 1px solid #e5e7eb;
-                                }
-                                .year-columns {
-                                    display: inline-flex;
-                                    flex-direction: row;
-                                    align-items: flex-start;
                                 }
                                 .year-column {
-                                    display: inline-block;
-                                    vertical-align: top;
-                                    width: 200px;
-                                    padding: 10px;
+                                    min-width: 250px;
                                     border-right: 1px solid #e5e7eb;
-                                }
-                                .year-header {
-                                    font-weight: bold;
-                                    padding: 8px 0;
-                                    border-bottom: 1px solid #e5e7eb;
-                                    margin-bottom: 8px;
-                                    position: sticky;
-                                    top: 0;
-                                    background: white;
-                                }
-                                .section-item {
-                                    white-space: normal;
-                                    padding: 2px 0;
-                                }
-                                .new-section {
-                                    background-color: #dcfce7;
-                                    border-radius: 4px;
-                                    padding: 2px 4px;
+                                    padding-right: 1rem;
                                 }
                             </style>
                         """, unsafe_allow_html=True)
-
-                        # Create the container
-                        container_html = '<div class="horizontal-scroll"><div class="year-columns">'
                         
-                        # Add columns for each year
-                        for year, sections in sorted(toc_history.items()):
-                            container_html += f"""
-                                <div class="year-column">
-                                    <div class="year-header">{year}</div>
-                                    <div class="year-content">
-                            """
-                            
-                            # Add sections
-                            for section in sections:
-                                indent = "&nbsp;" * (4 * (section['level'] - 1))
-                                section_class = "new-section" if section.get('isNew') else ""
-                                dots = "·" * section['level']
-                                
-                                container_html += f"""
-                                    <div class="section-item">
-                                        <span class="{section_class}">
-                                            {indent}{section['title']}
-                                            <span style="color: gray; font-family: monospace;">{dots}</span>
-                                        </span>
-                                    </div>
-                                """
-                            
-                            container_html += "</div></div>"
+                        # Create columns for all years
+                        cols = st.columns(len(toc_history))
                         
-                        container_html += "</div></div>"
-                        
-                        # Display the horizontal timeline
-                        st.markdown(container_html, unsafe_allow_html=True)
+                        # Fill each column with its year data
+                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
+                            with cols[idx]:
+                                st.markdown(f"**{year}**")
+                                st.markdown("---")
+                                for section in sections:
+                                    indent = "&nbsp;" * (4 * (section['level'] - 1))
+                                    st.markdown(
+                                        f"{indent}{section['title']} "
+                                        f"<span style='color:gray;font-family:monospace;'>{'·' * section['level']}</span>",
+                                        unsafe_allow_html=True
+                                    )
                     
                     with tab2:
                         # Create heatmap data

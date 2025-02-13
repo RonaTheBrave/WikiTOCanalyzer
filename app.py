@@ -26,9 +26,11 @@ def get_page_history(title, start_date, end_date):
         "rvprop": "content|timestamp",
         "rvstart": end,
         "rvend": start,
-        "rvlimit": "1",  # Get one revision per request for testing
-        "formatversion": "2",  # Use newer format version for cleaner response
-        "redirects": "1"  # Follow redirects
+        "rvlimit": "1",
+        "formatversion": "2",
+        "redirects": "1",
+        "rvslots": "main",
+        "rvdir": "newer"
     }
     
     st.write("API URL:", api_url)
@@ -52,13 +54,24 @@ def get_page_history(title, start_date, end_date):
             
             if 'query' in data:
                 if 'pages' in data['query']:
+                    pages = data['query']['pages']
                     st.write("Found pages in response")
-                    st.write("Page data:", data['query']['pages'])
+                    st.write("Page data:", pages)
                     
-                    page = data['query']['pages'][0]  # formatversion=2 returns array
-                    if 'revisions' in page:
-                        revisions.extend(page['revisions'])
-                        st.write(f"Retrieved {len(page['revisions'])} revisions")
+                    if pages and len(pages) > 0:
+                        page = pages[0]  # formatversion=2 returns array
+                        if 'revisions' in page:
+                            for rev in page['revisions']:
+                                if 'slots' in rev and 'main' in rev['slots']:
+                                    content = rev['slots']['main']['content']
+                                    st.write(f"Found content of length: {len(content)}")
+                                    rev['content'] = content  # Store content in a standardized way
+                                    revisions.append(rev)
+                                elif '*' in rev:
+                                    content = rev['*']
+                                    st.write(f"Found content of length: {len(content)}")
+                                    revisions.append(rev)
+                            st.write(f"Retrieved {len(page['revisions'])} revisions")
                 else:
                     st.write("No pages found in response")
             else:
@@ -84,40 +97,37 @@ def extract_toc(wikitext):
     sections = []
     try:
         st.write("Processing wikitext length:", len(wikitext))
+        st.write("First 500 chars of wikitext:", wikitext[:500])
         
         # Simple section extraction using regex pattern
         lines = wikitext.split('\n')
+        in_section = False
+        current_section = None
+        
         for line in lines:
-            # Debug output for potential section lines
-            if '=' in line:
-                st.write("Potential section line:", line)
+            line = line.strip()
             
-            if line.strip().startswith('==') and line.strip().endswith('=='):
-                # Count leading = signs to determine level
-                level_count = 0
-                for char in line.strip():
-                    if char == '=':
-                        level_count += 1
-                    else:
-                        break
-                
-                # Extract title and remove any remaining = signs
-                title = line.strip('= \t\n\r')
-                level = level_count // 2  # Divide by 2 as == is level 1
-                
-                if title and level > 0:
-                    section_data = {
-                        "title": title,
+            # Look for section headers of various forms
+            if line.startswith('==') and line.endswith('=='):
+                # Standard section header
+                raw_title = line.strip('=').strip()
+                level = (len(line) - len(raw_title.strip())) // 2
+                if raw_title and level > 0:
+                    current_section = {
+                        "title": raw_title,
                         "level": level
                     }
-                    sections.append(section_data)
-                    st.write("Found section:", section_data)
-    
+                    sections.append(current_section)
+                    st.write(f"Found section: {raw_title} (level {level})")
+            
+            # You could add more section pattern matching here
+            
+        st.write(f"Total sections found: {len(sections)}")
+        
     except Exception as e:
         st.error(f"Error parsing sections: {str(e)}")
-        st.write("Problematic wikitext:", wikitext[:500] + "...")  # Show first 500 chars
+        st.write("Problematic wikitext:", wikitext[:500] + "...")
     
-    st.write(f"Total sections found: {len(sections)}")
     return sections
 
 def get_toc_history(title, start_date, end_date):

@@ -110,16 +110,25 @@ def process_revision_history(title):
     yearly_revisions = {}
     for rev in revisions:
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
+        revid = rev['revid']
+        
+        # Store revision if it's the first one we've seen for this year
         if year not in yearly_revisions:
-            yearly_revisions[year] = rev['revid']
+            yearly_revisions[year] = revid
+            st.write(f"Found revision for year {year}: {revid}")
+    
+    st.write(f"Found revisions for years: {sorted(yearly_revisions.keys())}")
     
     # Get TOC for each year's first revision
     toc_history = {}
     for year, revid in sorted(yearly_revisions.items()):
+        st.write(f"Processing year {year} (revision {revid})")
         content = get_revision_content(title, revid)
         if content:
+            st.write(f"Got content for year {year} ({len(content)} bytes)")
             sections = extract_toc(content)
             if sections:
+                st.write(f"Found {len(sections)} sections for year {year}")
                 toc_history[str(year)] = sections
     
     return toc_history
@@ -159,23 +168,26 @@ if wiki_page:
                     
                     with tab1:
                         # Display TOC timeline
+                        st.write("### Timeline of Table of Contents Changes")
+                        st.write("Each year shows the structure of the article at that point in time.")
+                        
                         for year, sections in sorted(toc_history.items()):
-                            col = st.columns([1, 3])
-                            with col[0]:
-                                st.write(f"**{year}**")
-                            with col[1]:
+                            with st.expander(f"Year: {year}", expanded=True):
                                 for section in sections:
                                     indent = "&nbsp;" * (4 * (section['level'] - 1))
                                     st.markdown(
                                         f"{indent}{section['title']} "
-                                        f"<span style='color:gray'>{'*' * section['level']}</span>",
+                                        f"<span style='color:gray;font-family:monospace;'>{'·' * section['level']}</span>",
                                         unsafe_allow_html=True
                                     )
-                                st.markdown("---")
                     
                     with tab2:
                         # Create heatmap data
+                        st.write("### Section Activity Heatmap")
+                        st.write("Shows when different sections appeared and their relative positions.")
+                        
                         edit_data = []
+                        all_sections = set()
                         for year, sections in toc_history.items():
                             for section in sections:
                                 edit_data.append({
@@ -183,16 +195,32 @@ if wiki_page:
                                     'Section': section['title'],
                                     'Level': section['level']
                                 })
+                                all_sections.add(section['title'])
                         
                         if edit_data:
                             df = pd.DataFrame(edit_data)
+                            
+                            # Sort sections by their most common level
+                            section_levels = df.groupby('Section')['Level'].mean().sort_values()
+                            ordered_sections = section_levels.index.tolist()
+                            
                             fig = px.density_heatmap(
                                 df,
                                 x='Year',
                                 y='Section',
-                                title='Section Activity Over Time',
-                                color_continuous_scale='Reds'
+                                category_orders={'Section': ordered_sections},
+                                title='Section Presence Over Time',
+                                color_continuous_scale='Reds',
+                                height=max(400, len(all_sections) * 20)  # Adjust height based on number of sections
                             )
+                            
+                            # Update layout for better readability
+                            fig.update_layout(
+                                yaxis_title="Section Name",
+                                xaxis_title="Year",
+                                yaxis={'categoryorder': 'array', 'categoryarray': ordered_sections}
+                            )
+                            
                             st.plotly_chart(fig, use_container_width=True)
                         else:
                             st.warning("No data available for visualization.")

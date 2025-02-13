@@ -142,7 +142,7 @@ with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
         "Enter Wikipedia Page Title",
-        "Dog",
+        "Opioid-induced hyperalgesia",
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
 
@@ -174,7 +174,7 @@ if wiki_page:
                         with controls_col2:
                             st.button("Fit Screen", key="unique_fit_btn")
                         with controls_col3:
-                            # Create proper CSV data
+                            # Create CSV data
                             csv_data = []
                             for year, sections in sorted(toc_history.items()):
                                 for section in sections:
@@ -185,33 +185,59 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "Download CSV",
+                                "⬇️",
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
-                                key="unique_download_btn"
+                                key="unique_download_btn",
+                                help="Download data as CSV"
                             )
                         
                         # Timeline view styling
-                        st.markdown("""
+                        st.markdown(f"""
                             <style>
-                                .stHorizontalBlock {
+                                .stHorizontalBlock {{
                                     overflow-x: auto;
                                     padding: 1rem;
                                     background: white;
                                     border: 1px solid #e5e7eb;
                                     border-radius: 4px;
-                                }
-                                .section-title {
+                                }}
+                                [data-testid="column"] {{
+                                    min-width: 300px;
+                                    border-right: 1px solid #e5e7eb;
+                                    padding: 1rem !important;
+                                }}
+                                .section-container {{
+                                    position: relative;
                                     padding: 2px 4px;
                                     margin: 2px 0;
+                                }}
+                                .section-title {{
                                     white-space: nowrap;
                                     overflow: hidden;
                                     text-overflow: ellipsis;
-                                }
-                                .section-new {
+                                    padding: 2px 4px;
+                                    border-radius: 4px;
+                                    font-size: {13 * zoom_level/100}px;
+                                    transition: all 0.2s;
+                                }}
+                                .section-title:hover {{
+                                    background-color: #f3f4f6;
+                                    white-space: normal;
+                                    position: relative;
+                                    z-index: 1000;
+                                }}
+                                .section-new {{
                                     background-color: #dcfce7;
-                                }
+                                }}
+                                .vertical-line {{
+                                    position: absolute;
+                                    top: 0;
+                                    bottom: 0;
+                                    width: 1px;
+                                    background-color: #e5e7eb;
+                                }}
                             </style>
                         """, unsafe_allow_html=True)
                         
@@ -224,9 +250,23 @@ if wiki_page:
                                 st.markdown(f"### {year}")
                                 st.markdown("---")
                                 for section in sections:
-                                    indent = "&nbsp;" * (4 * (section['level'] - 1))
+                                    # Create vertical lines for hierarchy
+                                    level = section['level']
+                                    hierarchy_lines = ""
+                                    if level > 1:
+                                        for i in range(1, level):
+                                            left_pos = i * 20 - 10
+                                            hierarchy_lines += f'<div class="vertical-line" style="left: {left_pos}px"></div>'
+                                    
+                                    # Add class for new sections
+                                    section_class = "section-new" if section.get('isNew') else ""
+                                    
                                     st.markdown(
-                                        f"{indent}{section['title']}",
+                                        f'<div class="section-container" style="margin-left: {(level-1) * 20}px">'
+                                        f'{hierarchy_lines}'
+                                        f'<div class="section-title {section_class}" title="{section["title"]}">'
+                                        f'{section["title"]}'
+                                        f'</div></div>',
                                         unsafe_allow_html=True
                                     )
                     

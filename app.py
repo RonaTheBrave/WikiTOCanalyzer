@@ -189,17 +189,50 @@ if wiki_page:
                     with tab1:
                         # Display TOC timeline
                         st.write("### Timeline of Table of Contents Changes")
-                        st.write("Each year shows the structure of the article at that point in time.")
+                        st.write("Showing the evolution of sections over time.")
                         
+                        # Create a container with horizontal scroll
+                        st.markdown("""
+                            <style>
+                                .timeline-container {
+                                    display: flex;
+                                    overflow-x: auto;
+                                    padding: 1rem;
+                                    background: white;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 0.5rem;
+                                }
+                                .year-column {
+                                    flex: 0 0 250px;
+                                    padding: 0.5rem;
+                                    border-right: 1px solid #e5e7eb;
+                                }
+                                .year-header {
+                                    font-weight: bold;
+                                    padding-bottom: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                    border-bottom: 1px solid #e5e7eb;
+                                }
+                            </style>
+                            <div class="timeline-container">
+                        """, unsafe_allow_html=True)
+                        
+                        # Create columns for each year
+                        html_content = []
                         for year, sections in sorted(toc_history.items()):
-                            with st.expander(f"Year: {year}", expanded=True):
-                                for section in sections:
-                                    indent = "&nbsp;" * (4 * (section['level'] - 1))
-                                    st.markdown(
-                                        f"{indent}{section['title']} "
-                                        f"<span style='color:gray;font-family:monospace;'>{'·' * section['level']}</span>",
-                                        unsafe_allow_html=True
-                                    )
+                            year_html = f'<div class="year-column"><div class="year-header">{year}</div>'
+                            
+                            # Add sections
+                            for section in sections:
+                                indent = "&nbsp;" * (4 * (section['level'] - 1))
+                                dots = "·" * section['level']
+                                year_html += f'<div>{indent}{section["title"]} <span style="color: gray; font-family: monospace;">{dots}</span></div>'
+                            
+                            year_html += '</div>'
+                            html_content.append(year_html)
+                        
+                        # Combine all HTML content
+                        st.markdown("".join(html_content) + "</div>", unsafe_allow_html=True)
                     
                     with tab2:
                         # Create heatmap data

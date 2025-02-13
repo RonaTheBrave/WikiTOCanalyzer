@@ -187,10 +187,14 @@ if wiki_page:
                     tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
                     
                     with tab1:
-                        # Create container for horizontal scrolling
-                        st.markdown("""
+                        # Add zoom control
+                        zoom_level = st.slider("Zoom", min_value=50, max_value=200, value=100, step=10, format="%d%%")
+                        zoom_scale = zoom_level / 100.0
+                        
+                        # Create container for horizontal scrolling with zoom
+                        st.markdown(f"""
                             <style>
-                                .stHorizontalBlock {
+                                .stHorizontalBlock {{
                                     overflow-x: auto;
                                     display: flex;
                                     background: white;
@@ -198,42 +202,82 @@ if wiki_page:
                                     border-radius: 4px;
                                     padding: 0;
                                     margin: 1rem 0;
-                                }
-                                [data-testid="column"] {
+                                }}
+                                [data-testid="column"] {{
                                     border-right: 1px solid #e5e7eb;
                                     padding: 1rem !important;
-                                    min-width: 250px;
-                                }
-                                .year-header {
+                                    min-width: 300px;
+                                }}
+                                .year-header {{
                                     font-weight: 600;
                                     padding-bottom: 0.5rem;
                                     margin-bottom: 0.5rem;
                                     border-bottom: 1px solid #e5e7eb;
-                                }
-                                .section-title {
+                                    font-size: {14 * zoom_scale}px;
+                                }}
+                                .section-title {{
                                     padding: 2px 4px;
                                     margin: 2px 0;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                    position: relative;
+                                    font-size: {13 * zoom_scale}px;
+                                }}
+                                .section-title:hover {{
                                     white-space: normal;
-                                }
-                                .section-new {
+                                    background-color: #f3f4f6;
+                                    z-index: 1000;
+                                }}
+                                .section-new {{
                                     background-color: #dcfce7;
-                                    border-radius: 4px;
-                                }
-                                .section-deleted {
+                                }}
+                                .section-deleted {{
                                     background-color: #fee2e2;
-                                    border-radius: 4px;
-                                }
-                                .level-indicator {
-                                    color: #9ca3af;
-                                    font-family: monospace;
-                                    font-size: 0.8em;
-                                    opacity: 0.5;
-                                }
-                                .indented-1 { margin-left: 1rem; }
-                                .indented-2 { margin-left: 2rem; }
-                                .indented-3 { margin-left: 3rem; }
+                                }}
+                                .hierarchy-line {{
+                                    border-left: 2px solid #e5e7eb;
+                                    position: absolute;
+                                    left: 0;
+                                    top: 0;
+                                    bottom: 0;
+                                }}
+                                .indented-1 {{ padding-left: 1.5rem; }}
+                                .indented-2 {{ padding-left: 3rem; }}
+                                .indented-3 {{ padding-left: 4.5rem; }}
                             </style>
                         """, unsafe_allow_html=True)
+                        
+                        # Create columns for all years
+                        cols = st.columns(len(toc_history))
+                        
+                        # Fill each column with its year data
+                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
+                            with cols[idx]:
+                                # Year header
+                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                
+                                # Sections
+                                for section in sections:
+                                    # Determine section status
+                                    status_class = "section-new" if section.get('isNew') else ""
+                                    status_class = "section-deleted" if section.get('isDeleted') else status_class
+                                    
+                                    # Create indentation class based on level
+                                    indent_class = f"indented-{section['level'] - 1}" if section['level'] > 1 else ""
+                                    
+                                    # Create hierarchy lines based on level
+                                    hierarchy_lines = ""
+                                    for i in range(1, section['level']):
+                                        left_position = i * 1.5 - 1.25  # Adjust position of lines
+                                        hierarchy_lines += f'<div class="hierarchy-line" style="left: {left_position}rem"></div>'
+                                    
+                                    st.markdown(
+                                        f'<div class="section-title {status_class} {indent_class}" title="{section["title"]}">'
+                                        f'{hierarchy_lines}{section["title"]}'
+                                        f'</div>',
+                                        unsafe_allow_html=True
+                                    )
                         
                         # Create columns for all years
                         cols = st.columns(len(toc_history))

@@ -278,6 +278,20 @@ if wiki_page:
                 if toc_history:
                     st.success(f"Found historical versions from {len(toc_history)} different years")
                     
+                    # Summary of changes
+                    rename_summary = []
+                    for year, data in sorted(toc_history.items()):
+                        if data.get("renamed"):
+                            for new_name, old_name in data["renamed"].items():
+                                rename_summary.append(f"{year}: '{old_name}' → '{new_name}'")
+                    
+                    if rename_summary:
+                        with st.expander("Section Renames Detected"):
+                            for rename in rename_summary:
+                                st.write(rename)
+                    else:
+                        st.info("No section renames were detected in the history.")
+                    
                     # View mode selection
                     view_mode = st.radio(
                         "View Mode",
@@ -288,13 +302,18 @@ if wiki_page:
                     
                     if view_mode == "Timeline View":
                                                     # Controls section
-                        cols = st.columns([4, 2])  # Making zoom control smaller
-                        with cols[1]:  # Right-aligned controls
-                            st.write('<div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">', unsafe_allow_html=True)
-                            zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
-                                                 label_visibility="collapsed",
-                                                 key="unique_zoom_slider")
+                        st.write('<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">', unsafe_allow_html=True)
+                        
+                        # Make zoom slider more compact
+                        zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
+                                             label_visibility="collapsed",
+                                             key="unique_zoom_slider")
+                        
+                        # Group the buttons horizontally
+                        col1, col2, col3 = st.columns([1, 1, 1])
+                        with col1:
                             st.button("⟲", key="unique_fit_btn")
+                        with col2:
                             csv_data = []
                             for year, data in sorted(toc_history.items()):
                                 for section in data["sections"]:
@@ -312,7 +331,31 @@ if wiki_page:
                                 key="unique_download_btn",
                                 help="Download data as CSV"
                             )
-                            st.write('</div>', unsafe_allow_html=True)
+                        st.write('</div>', unsafe_allow_html=True)
+                        
+                        # Add CSS for controls
+                        st.markdown("""
+                            <style>
+                                /* Make slider more compact */
+                                [data-testid="stSlider"] {
+                                    width: 100px !important;
+                                    padding-left: 0 !important;
+                                    padding-right: 0 !important;
+                                }
+                                
+                                /* Fix button layout */
+                                .stButton {
+                                    display: inline-block !important;
+                                }
+                                
+                                /* Ensure buttons are side by side */
+                                [data-testid="column"] {
+                                    padding: 0 !important;
+                                    display: inline-flex !important;
+                                    justify-content: flex-end !important;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
                         
                         # Custom styling
                         st.markdown(f"""

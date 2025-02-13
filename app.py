@@ -172,9 +172,8 @@ if wiki_page:
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
                         with controls_col2:
-                            st.button("Fit Screen", key="unique_fit_btn")
+                            st.button("↔️", help="Fit to screen", key="unique_fit_btn")
                         with controls_col3:
-                            # Create CSV data
                             csv_data = []
                             for year, sections in sorted(toc_history.items()):
                                 for section in sections:
@@ -185,7 +184,7 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "⬇️",
+                                "↓",
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
@@ -208,9 +207,16 @@ if wiki_page:
                                     border-right: 1px solid #e5e7eb;
                                     padding: 1rem !important;
                                 }}
+                                .year-header {{
+                                    font-size: {14 * zoom_level/100}px !important;
+                                    font-weight: 600;
+                                    margin-bottom: 1rem;
+                                    padding-bottom: 0.5rem;
+                                    border-bottom: 1px solid #e5e7eb;
+                                }}
                                 .section-container {{
                                     position: relative;
-                                    padding: 2px 4px;
+                                    padding: 2px 4px 2px 24px;
                                     margin: 2px 0;
                                 }}
                                 .section-title {{
@@ -221,22 +227,35 @@ if wiki_page:
                                     border-radius: 4px;
                                     font-size: {13 * zoom_level/100}px;
                                     transition: all 0.2s;
+                                    position: relative;
+                                    z-index: 2;
                                 }}
                                 .section-title:hover {{
                                     background-color: #f3f4f6;
                                     white-space: normal;
-                                    position: relative;
-                                    z-index: 1000;
                                 }}
                                 .section-new {{
-                                    background-color: #dcfce7;
+                                    background-color: #dcfce7 !important;
                                 }}
                                 .vertical-line {{
                                     position: absolute;
+                                    left: 12px;
                                     top: 0;
                                     bottom: 0;
-                                    width: 1px;
+                                    width: 2px;
                                     background-color: #e5e7eb;
+                                    z-index: 1;
+                                }}
+                                /* Make buttons more elegant */
+                                .stButton button {{
+                                    padding: 0.25rem 0.5rem;
+                                    font-size: 1rem;
+                                    border: 1px solid #e5e7eb;
+                                    background-color: white;
+                                    border-radius: 4px;
+                                }}
+                                .stButton button:hover {{
+                                    background-color: #f3f4f6;
                                 }}
                             </style>
                         """, unsafe_allow_html=True)
@@ -245,30 +264,42 @@ if wiki_page:
                         cols = st.columns(len(toc_history))
                         
                         # Display content in columns
+                        prev_year_sections = set()  # Track sections from previous year
                         for idx, (year, sections) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
-                                st.markdown(f"### {year}")
-                                st.markdown("---")
+                                # Year header
+                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                
+                                # Get current year's section titles
+                                current_sections = {s["title"] for s in sections}
+                                
+                                # Process sections
                                 for section in sections:
-                                    # Create vertical lines for hierarchy
                                     level = section['level']
+                                    
+                                    # Check if section is new (not in previous year)
+                                    section['isNew'] = section['title'] not in prev_year_sections
+                                    
+                                    # Create vertical lines for hierarchy
                                     hierarchy_lines = ""
                                     if level > 1:
-                                        for i in range(1, level):
-                                            left_pos = i * 20 - 10
-                                            hierarchy_lines += f'<div class="vertical-line" style="left: {left_pos}px"></div>'
+                                        hierarchy_lines = '<div class="vertical-line"></div>'
                                     
                                     # Add class for new sections
                                     section_class = "section-new" if section.get('isNew') else ""
+                                    indent_style = f"margin-left: {(level-1) * 20}px"
                                     
                                     st.markdown(
-                                        f'<div class="section-container" style="margin-left: {(level-1) * 20}px">'
+                                        f'<div class="section-container" style="{indent_style}">'
                                         f'{hierarchy_lines}'
                                         f'<div class="section-title {section_class}" title="{section["title"]}">'
                                         f'{section["title"]}'
                                         f'</div></div>',
                                         unsafe_allow_html=True
                                     )
+                                
+                                # Update previous year's sections for next iteration
+                                prev_year_sections = current_sections
                     
                     with tab2:
                         # Edit Activity view code here...

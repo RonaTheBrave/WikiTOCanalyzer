@@ -10,9 +10,10 @@ def get_page_history(title, start_date, end_date):
     """
     Fetch revision history for a Wikipedia page between given dates.
     """
-    # Format dates for API
-    start = start_date.strftime("%Y%m%d")
-    end = end_date.strftime("%Y%m%d")
+    # Format dates for API - use today's date as end and calculate start from there
+    today = datetime.now().date()
+    end = today.strftime("%Y%m%d")
+    start = (today - timedelta(days=365*5)).strftime("%Y%m%d")  # Get 5 years of history
     
     # API endpoint with corrected parameters for content retrieval
     api_url = "https://en.wikipedia.org/w/api.php"
@@ -21,10 +22,10 @@ def get_page_history(title, start_date, end_date):
         "format": "json",
         "prop": "revisions",
         "titles": title,
-        "rvprop": "timestamp|user|comment|content",  # Added more properties
+        "rvprop": "timestamp|user|comment|content",
         "rvstart": end,
         "rvend": start,
-        "rvlimit": "10",  # Increased limit
+        "rvlimit": "10",
         "rvdir": "older",
         "rvslots": "*",
         "formatversion": "2"
@@ -36,6 +37,7 @@ def get_page_history(title, start_date, end_date):
     try:
         response = requests.get(api_url, params=params)
         data = response.json()
+        st.write("API Response:", data)  # Debug output
         
         if 'query' in data and 'pages' in data['query']:
             page = data['query']['pages'][0]  # Using formatversion=2
@@ -46,6 +48,7 @@ def get_page_history(title, start_date, end_date):
                 # Print first revision content for debugging
                 if revisions:
                     first_rev = revisions[0]
+                    st.write("First revision data:", first_rev)  # Debug output
                     if 'slots' in first_rev and 'main' in first_rev['slots']:
                         content = first_rev['slots']['main']['content']
                         st.write("Sample content (first 500 chars):", content[:500])
@@ -57,6 +60,7 @@ def get_page_history(title, start_date, end_date):
             
     except Exception as e:
         st.error(f"Error making API request: {str(e)}")
+        st.write("Full error details:", e)  # Debug output
     
     return revisions
 
@@ -92,6 +96,7 @@ def extract_toc(wikitext):
     
     except Exception as e:
         st.error(f"Error extracting TOC: {str(e)}")
+        st.write("Full error details:", e)  # Debug output
     
     return sections
 
@@ -127,6 +132,7 @@ def get_toc_history(title, start_date, end_date):
                         
         except Exception as e:
             st.error(f"Error processing revision: {str(e)}")
+            st.write("Full error details:", e)  # Debug output
             continue
     
     return dict(sorted(toc_history.items()))
@@ -146,26 +152,16 @@ with st.sidebar:
         help="Enter the exact title as it appears in the Wikipedia URL (e.g., 'Python_(programming_language)')"
     )
     
-    end_date = st.date_input(
-        "End Date",
-        datetime.now().date(),
-        help="Select the end date for the history view"
-    )
-    
-    years_back = st.slider(
-        "Years of History",
-        min_value=1,
-        max_value=10,
-        value=5,
-        help="Select how many years of history to view"
-    )
-    
-    start_date = end_date - timedelta(days=365*years_back)
+    st.write("Note: The tool will show the last 5 years of history from today's date.")
 
 if wiki_page:
     try:
         with st.spinner("Fetching page history..."):
-            # Get TOC history
+            # Get TOC history using current date as reference
+            today = datetime.now().date()
+            start_date = today - timedelta(days=365*5)  # 5 years ago
+            end_date = today
+            
             toc_history = get_toc_history(wiki_page, start_date, end_date)
             
             if not toc_history:

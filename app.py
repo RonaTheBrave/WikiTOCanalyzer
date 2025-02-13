@@ -165,14 +165,14 @@ if wiki_page:
                     tab1, tab2 = st.tabs(["Timeline View", "Edit Activity"])
                     
                     with tab1:
-                        # Controls
-                        controls_col1, controls_col2, controls_col3, _ = st.columns([1, 1, 1, 4])
+                        # Move controls to the right
+                        _, controls_col1, controls_col2, controls_col3 = st.columns([3, 1, 1, 1])
                         with controls_col1:
                             zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
                                                  label_visibility="collapsed",
                                                  key="unique_zoom_slider")
                         with controls_col2:
-                            st.button("↔️", help="Fit to screen", key="unique_fit_btn")
+                            st.button("Fit to Screen", key="unique_fit_btn")
                         with controls_col3:
                             csv_data = []
                             for year, sections in sorted(toc_history.items()):
@@ -184,7 +184,7 @@ if wiki_page:
                                     })
                             csv_df = pd.DataFrame(csv_data)
                             st.download_button(
-                                "↓",
+                                "📥",  # Using a more elegant download icon
                                 data=csv_df.to_csv(index=False),
                                 file_name="toc_history.csv",
                                 mime="text/csv",
@@ -213,6 +213,7 @@ if wiki_page:
                                     margin-bottom: 1rem;
                                     padding-bottom: 0.5rem;
                                     border-bottom: 1px solid #e5e7eb;
+                                    text-align: center;
                                 }}
                                 .section-container {{
                                     position: relative;
@@ -246,19 +247,63 @@ if wiki_page:
                                     background-color: #e5e7eb;
                                     z-index: 1;
                                 }}
-                                /* Make buttons more elegant */
+                                /* Style for buttons */
                                 .stButton button {{
                                     padding: 0.25rem 0.5rem;
-                                    font-size: 1rem;
+                                    font-size: 0.875rem;
                                     border: 1px solid #e5e7eb;
                                     background-color: white;
                                     border-radius: 4px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
                                 }}
                                 .stButton button:hover {{
                                     background-color: #f3f4f6;
                                 }}
                             </style>
                         """, unsafe_allow_html=True)
+                        
+                        # Create columns for each year
+                        cols = st.columns(len(toc_history))
+                        
+                        # Display content in columns
+                        prev_year_sections = set()  # Track sections from previous year
+                        for idx, (year, sections) in enumerate(sorted(toc_history.items())):
+                            with cols[idx]:
+                                # Year header centered
+                                st.markdown(f'<div class="year-header">{year}</div>', unsafe_allow_html=True)
+                                
+                                # Get current year's section titles
+                                current_sections = {s["title"] for s in sections}
+                                
+                                # Process sections
+                                for section in sections:
+                                    level = section['level']
+                                    
+                                    # Check if section is new
+                                    section['isNew'] = section['title'] not in prev_year_sections
+                                    
+                                    # Create vertical lines only for nested sections (level > 1)
+                                    hierarchy_lines = ""
+                                    if level > 1:
+                                        hierarchy_lines = '<div class="vertical-line"></div>'
+                                    
+                                    # Add class for new sections
+                                    section_class = "section-new" if section.get('isNew') else ""
+                                    indent_style = f"margin-left: {(level-1) * 20}px" if level > 1 else ""
+                                    
+                                    st.markdown(
+                                        f'<div class="section-container" style="{indent_style}">'
+                                        f'{hierarchy_lines}'
+                                        f'<div class="section-title {section_class}" title="{section["title"]}">'
+                                        f'{section["title"]}'
+                                        f'</div></div>',
+                                        unsafe_allow_html=True
+                                    )
+                                
+                                # Update previous year's sections
+                                prev_year_sections = current_sections
                         
                         # Create columns for each year
                         cols = st.columns(len(toc_history))

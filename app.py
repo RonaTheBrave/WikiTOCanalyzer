@@ -273,7 +273,7 @@ if wiki_page:
                 current_sections = extract_toc(current_content)
                 
                 # Get historical versions
-                toc_history = process_revision_history(wiki_page)
+                toc_history, revision_ids = process_revision_history(wiki_page)
                 
                 if toc_history:
                     st.success(f"Found historical versions from {len(toc_history)} different years")

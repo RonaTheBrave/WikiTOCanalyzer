@@ -495,14 +495,10 @@ if wiki_page:
                         cols = st.columns(len(toc_history))
                         for idx, (year, data) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
-                                # Display year header with link
-                                st.markdown(
-                                    f'<div class="year-header">'
-                                    f'<a href="https://en.wikipedia.org/w/index.php?oldid={data["revid"]}" '
-                                    f'class="year-link" target="_blank">{year}</a>'
-                                    f'</div>', 
-                                    unsafe_allow_html=True
-                                )
+                                # Display year header with revision link
+                                revid = revision_ids.get(year)
+                                year_link = f'<a href="https://en.wikipedia.org/w/index.php?oldid={revid}" class="year-link" target="_blank">{year}</a>' if revid else year
+                                st.markdown(f'<div class="year-header">{year_link}</div>', unsafe_allow_html=True)
                                 
                                 # Display current sections
                                 for section in data["sections"]:

@@ -301,37 +301,72 @@ if wiki_page:
                     )
                     
                     if view_mode == "Timeline View":
-                                                    # Controls section
-                        st.write('<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">', unsafe_allow_html=True)
+                                                    # Controls section aligned right
+                        st.write('<div style="display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-bottom: 8px;">', unsafe_allow_html=True)
                         
-                        # Make zoom slider more compact
+                        # All controls in one row
                         zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
                                              label_visibility="collapsed",
                                              key="unique_zoom_slider")
-                        
-                        # Group the buttons horizontally
-                        col1, col2, col3 = st.columns([1, 1, 1])
-                        with col1:
-                            st.button("⟲", key="unique_fit_btn")
-                        with col2:
-                            csv_data = []
-                            for year, data in sorted(toc_history.items()):
-                                for section in data["sections"]:
-                                    csv_data.append({
-                                        'Year': year,
-                                        'Section': section['title'],
-                                        'Level': section['level']
-                                    })
-                            csv_df = pd.DataFrame(csv_data)
-                            st.download_button(
-                                "↓",
-                                data=csv_df.to_csv(index=False),
-                                file_name="toc_history.csv",
-                                mime="text/csv",
-                                key="unique_download_btn",
-                                help="Download data as CSV"
-                            )
+                        st.button("⟲", key="unique_fit_btn")
+                        csv_data = []
+                        for year, data in sorted(toc_history.items()):
+                            for section in data["sections"]:
+                                csv_data.append({
+                                    'Year': year,
+                                    'Section': section['title'],
+                                    'Level': section['level']
+                                })
+                        csv_df = pd.DataFrame(csv_data)
+                        st.download_button(
+                            "↓",
+                            data=csv_df.to_csv(index=False),
+                            file_name="toc_history.csv",
+                            mime="text/csv",
+                            key="unique_download_btn",
+                            help="Download data as CSV"
+                        )
                         st.write('</div>', unsafe_allow_html=True)
+
+                        # CSS for controls
+                        st.markdown("""
+                            <style>
+                                /* Control container */
+                                div[data-testid="stHorizontalBlock"] > div {
+                                    flex: none !important;
+                                }
+                                
+                                /* Make slider compact */
+                                [data-testid="stSlider"] {
+                                    width: 80px !important;
+                                    min-width: 80px !important;
+                                    margin-right: 0 !important;
+                                    padding: 0 !important;
+                                }
+                                
+                                /* Fix button layout */
+                                .stButton, div[data-testid="stHorizontalBlock"] button {
+                                    margin: 0 !important;
+                                }
+                                
+                                /* Remove extra padding */
+                                .stDownloadButton {
+                                    margin: 0 !important;
+                                    padding: 0 !important;
+                                }
+                                
+                                /* Fix slider label */
+                                .stSlider div[data-baseweb="slider"] {
+                                    margin-top: 0 !important;
+                                }
+                                
+                                /* Align all controls vertically */
+                                .stSlider, .stButton, .stDownloadButton {
+                                    display: flex !important;
+                                    align-items: center !important;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
                         
                         # Add CSS for controls
                         st.markdown("""
@@ -460,8 +495,14 @@ if wiki_page:
                         cols = st.columns(len(toc_history))
                         for idx, (year, data) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
-                                st.markdown(f'<div class="year-header">{year}</div>', 
-                                          unsafe_allow_html=True)
+                                # Display year header with link
+                                st.markdown(
+                                    f'<div class="year-header">'
+                                    f'<a href="https://en.wikipedia.org/w/index.php?oldid={data["revid"]}" '
+                                    f'class="year-link" target="_blank">{year}</a>'
+                                    f'</div>', 
+                                    unsafe_allow_html=True
+                                )
                                 
                                 # Display current sections
                                 for section in data["sections"]:

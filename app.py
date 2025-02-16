@@ -187,35 +187,81 @@ def process_revision_history(title: str, start_year: int, end_year: int) -> Dict
 
 def render_timeline(toc_history: Dict, zoom_level: int) -> str:
     """Render the complete timeline view"""
-    timeline_html = '<div class="timeline-container">'
+    # Get all unique sections across all years
+    all_sections = set()
+    for year_data in toc_history.values():
+        for section in year_data["sections"]:
+            all_sections.add(section["title"])
     
-    for year, data in sorted(toc_history.items()):
-        timeline_html += render_timeline_column(year, data["sections"], zoom_level, data.get("revid"))
+    years = sorted(toc_history.keys())
     
-    timeline_html += '</div>'
-    return timeline_html
-
-def render_timeline_column(year: str, sections: List[Dict], zoom_level: int, revid: Optional[str] = None) -> str:
-    """Render a single year column in the timeline"""
-    wiki_link = f'<a href="https://en.wikipedia.org/w/index.php?oldid={revid}" target="_blank">{year}</a>' if revid else year
-    column_html = f'<div class="timeline-column" style="transform: scale({zoom_level/100});">'
-    column_html += f'<div class="year-header">{wiki_link}</div>'
+    # Start building the table
+    table_html = f'''
+    <div class="table-container" style="transform: scale({zoom_level/100}); transform-origin: left top;">
+        <table class="timeline-table">
+            <thead>
+                <tr>
+                    <th class="section-header">Section</th>
+                    <th class="section-header">Level</th>
+    '''
     
-    for section in sections:
-        classes = [f"section-title section-level-{section['level']}"]
-        if section.get("isNew"):
-            classes.append("section-new")
-        if section.get("isRenamed"):
-            classes.append("section-renamed")
+    # Add year columns
+    for year in years:
+        revid = toc_history[year].get("revid")
+        year_link = f'<a href="https://en.wikipedia.org/w/index.php?oldid={revid}" target="_blank">{year}</a>' if revid else year
+        table_html += f'<th class="year-header">{year_link}</th>'
+    
+    table_html += '</tr></thead><tbody>'
+    
+    # Add rows for each section
+    for section in sorted(all_sections):
+        table_html += '<tr>'
         
-        title_text = section["title"]
-        if section.get("isRenamed"):
-            title_text += f' (was: {section["previousTitle"]})'
+        # Find first occurrence of section to get its level
+        section_level = None
+        for year_data in toc_history.values():
+            for s in year_data["sections"]:
+                if s["title"] == section:
+                    section_level = s.get("level", 1)
+                    break
+            if section_level:
+                break
         
-        column_html += f'<div class="{" ".join(classes)}">{title_text}</div>'
+        # Add section name and level
+        indent = '&nbsp;' * ((section_level or 1) - 1) * 4
+        table_html += f'<td class="section-name">{indent}{section}</td>'
+        table_html += f'<td class="section-level">{"*" * (section_level or 1)}</td>'
+        
+        # Add cells for each year
+        for year in years:
+            cell_classes = ["section-cell"]
+            cell_content = ""
+            
+            # Find section in this year's data
+            year_data = toc_history[year]
+            section_exists = False
+            section_info = None
+            
+            for s in year_data["sections"]:
+                if s["title"] == section:
+                    section_exists = True
+                    section_info = s
+                    break
+            
+            if section_exists:
+                if section_info.get("isNew"):
+                    cell_classes.append("section-new")
+                elif section_info.get("isRenamed"):
+                    cell_classes.append("section-renamed")
+                cell_content = "●"
+            
+            cell_class_str = ' '.join(cell_classes)
+            table_html += f'<td class="{cell_class_str}">{cell_content}</td>'
+        
+        table_html += '</tr>'
     
-    column_html += '</div>'
-    return column_html
+    table_html += '</tbody></table></div>'
+    return table_html
 
 # Main application code
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")

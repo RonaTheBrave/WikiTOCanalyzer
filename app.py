@@ -186,24 +186,45 @@ def process_revision_history(title: str, start_year: int, end_year: int) -> Dict
     return yearly_revisions
 
 def render_timeline(toc_history: Dict, zoom_level: int) -> str:
-    """Render the complete timeline view"""
-    # Get all unique sections across all years
-    all_sections = set()
-    for year_data in toc_history.values():
-        for section in year_data["sections"]:
-            all_sections.add(section["title"])
+    """Render the complete timeline view with side-by-side columns"""
+    timeline_html = f'<div class="timeline-container" style="transform: scale({zoom_level/100}); transform-origin: left top;">'
     
-    years = sorted(toc_history.keys())
+    for year, data in sorted(toc_history.items()):
+        # Create column for each year
+        timeline_html += '<div class="year-column">'
+        
+        # Year header with revision link if available
+        revid = data.get("revid")
+        year_link = f'<a href="https://en.wikipedia.org/w/index.php?oldid={revid}" target="_blank">{year}</a>' if revid else year
+        timeline_html += f'<div class="year-header">{year_link}</div>'
+        
+        # Sections list
+        timeline_html += '<div class="sections-list">'
+        for section in data["sections"]:
+            # Determine section classes
+            classes = ["section-title"]
+            if section.get("isNew"):
+                classes.append("section-new")
+            if section.get("isRenamed"):
+                classes.append("section-renamed")
+            
+            # Add indentation based on level
+            indent_class = f"level-{section.get('level', 1)}"
+            classes.append(indent_class)
+            
+            # Compose section HTML
+            section_html = f'<div class="{" ".join(classes)}">'
+            section_html += section["title"]
+            if section.get("isRenamed"):
+                section_html += f' <span class="rename-note">(was: {section["previousTitle"]})</span>'
+            section_html += '</div>'
+            
+            timeline_html += section_html
+        
+        timeline_html += '</div></div>'  # Close sections-list and year-column
     
-    # Start building the table
-    table_html = f'''
-    <div class="table-container" style="transform: scale({zoom_level/100}); transform-origin: left top;">
-        <table class="timeline-table">
-            <thead>
-                <tr>
-                    <th class="section-header">Section</th>
-                    <th class="section-header">Level</th>
-    '''
+    timeline_html += '</div>'  # Close timeline-container
+    return timeline_html
     
     # Add year columns
     for year in years:

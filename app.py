@@ -21,33 +21,22 @@ st.markdown("""
     .stApp {
         background-color: #f9fafb;
     }
-    .element-container {
+    
+    /* Timeline column styling */
+    .timeline-column {
         background-color: white;
-        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
         padding: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
+        margin: 0.5rem;
+        min-width: 250px;
     }
     
-    /* Controls styling */
-    .stRadio > label {
-        background-color: transparent !important;
-        border: none !important;
-    }
-    .stRadio > div {
-        flex-direction: row !important;
-        gap: 0.5rem !important;
-    }
-    
-    /* Timeline view styling */
-    .timeline-container {
-        display: flex;
-        overflow-x: auto;
-        gap: 1rem;
-        padding: 1rem;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    .year-header {
+        font-weight: 600;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 0.5rem;
     }
     
     /* Section styling */
@@ -56,7 +45,15 @@ st.markdown("""
         border-radius: 4px;
         margin: 0.25rem 0;
         font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
+    
+    .section-level-1 { margin-left: 0px; }
+    .section-level-2 { margin-left: 20px; }
+    .section-level-3 { margin-left: 40px; }
+    
     .section-new {
         background-color: #dcfce7;
     }
@@ -67,89 +64,133 @@ st.markdown("""
         background-color: #fee2e2;
     }
     
-    /* Heatmap styling */
-    .heatmap-cell {
-        text-align: center;
-        padding: 0.25rem;
-        border-radius: 4px;
-    }
-    
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Custom button styling */
-    .stButton > button {
-        border-radius: 4px;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.875rem;
-        border: 1px solid #e5e7eb;
-        background-color: white;
-    }
-    .stButton > button:hover {
-        border-color: #d1d5db;
-        background-color: #f9fafb;
+    /* Container for horizontal scrolling */
+    .timeline-container {
+        display: flex;
+        overflow-x: auto;
+        padding: 1rem;
+        gap: 1rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
 
-def create_edit_activity_heatmap(toc_history: Dict) -> go.Figure:
-    """
-    Create a heatmap visualization of edit activity
-    """
-    # Process data to get edit counts per section per year
-    sections = []
-    years = sorted(toc_history.keys())
+def get_sample_data():
+    """Return sample TOC history data for testing"""
+    return {
+        "2019": {
+            "sections": [
+                {"title": "Signs and symptoms", "level": 1},
+                {"title": "Pathophysiology", "level": 1},
+                {"title": "Diagnosis", "level": 1},
+                {"title": "Prevention", "level": 1, "isNew": True},
+                {"title": "Treatment", "level": 1},
+                {"title": "References", "level": 1}
+            ]
+        },
+        "2020": {
+            "sections": [
+                {"title": "Signs and symptoms", "level": 1},
+                {"title": "Pathophysiology", "level": 1},
+                {"title": "Mechanism", "level": 2, "isNew": True},
+                {"title": "Diagnosis", "level": 1},
+                {"title": "Prevention", "level": 1},
+                {"title": "Treatment", "level": 1},
+                {"title": "References", "level": 1}
+            ]
+        },
+        "2021": {
+            "sections": [
+                {"title": "Signs and symptoms", "level": 1},
+                {"title": "Pathophysiology", "level": 1},
+                {"title": "Mechanism", "level": 2},
+                {"title": "Diagnosis", "level": 1},
+                {"title": "Prevention", "level": 1},
+                {"title": "Treatment", "level": 1},
+                {"title": "Management strategies", "level": 2, "isNew": True},
+                {"title": "References", "level": 1}
+            ]
+        }
+    }
+
+def render_timeline_column(year: str, sections: List[Dict], zoom_level: int):
+    """Render a single year column in the timeline"""
+    column_html = f'<div class="timeline-column" style="transform: scale({zoom_level/100});">'
+    column_html += f'<div class="year-header">{year}</div>'
     
-    for year, data in toc_history.items():
-        for section in data["sections"]:
-            section_name = section["title"]
-            if section_name not in sections:
-                sections.append(section_name)
-    
-    # Create matrix for heatmap
-    edit_matrix = []
     for section in sections:
-        row = []
-        for year in years:
-            # Count section presence and changes
-            year_data = toc_history[year]
-            count = 0
-            for s in year_data["sections"]:
-                if s["title"] == section:
-                    count = 1
-                    if s.get("isNew") or s.get("isRenamed"):
-                        count = 2
-            row.append(count)
-        edit_matrix.append(row)
+        # Determine section classes
+        classes = [f"section-title section-level-{section['level']}"]
+        if section.get("isNew"):
+            classes.append("section-new")
+        if section.get("isRenamed"):
+            classes.append("section-renamed")
+        if section.get("isRemoved"):
+            classes.append("section-removed")
+        
+        # Add section to column
+        column_html += f'<div class="{" ".join(classes)}">{section["title"]}</div>'
     
-    # Create heatmap
-    fig = go.Figure(data=go.Heatmap(
-        z=edit_matrix,
-        x=years,
-        y=sections,
-        colorscale=[
-            [0, '#ffffff'],
-            [0.5, '#ffcccc'],
-            [1, '#ff0000']
-        ],
-        showscale=False
+    column_html += '</div>'
+    return column_html
+
+def render_timeline(toc_history: Dict, zoom_level: int):
+    """Render the complete timeline view"""
+    timeline_html = '<div class="timeline-container">'
+    
+    for year, data in sorted(toc_history.items()):
+        timeline_html += render_timeline_column(year, data["sections"], zoom_level)
+    
+    timeline_html += '</div>'
+    return timeline_html
+
+def create_section_count_chart(toc_history: Dict) -> go.Figure:
+    """Create section count visualization"""
+    counts = []
+    for year, data in sorted(toc_history.items()):
+        total = len(data["sections"])
+        new = len([s for s in data["sections"] if s.get("isNew", False)])
+        counts.append({
+            "Year": year,
+            "Total Sections": total,
+            "New Sections": new
+        })
+    
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[c["Year"] for c in counts],
+        y=[c["Total Sections"] for c in counts],
+        name="Total Sections",
+        marker_color='rgb(55, 83, 109)'
+    ))
+    fig.add_trace(go.Bar(
+        x=[c["Year"] for c in counts],
+        y=[c["New Sections"] for c in counts],
+        name="New Sections",
+        marker_color='rgb(26, 118, 255)'
     ))
     
     fig.update_layout(
-        title="Section Edit Activity",
+        title="Section Count Evolution",
         xaxis_title="Year",
-        yaxis_title="Section",
-        height=max(400, len(sections) * 30)
+        yaxis_title="Number of Sections",
+        barmode='group',
+        bargap=0.15,
+        bargroupgap=0.1
     )
     
     return fig
 
 def main():
-    # Title and description
     st.title("Wikipedia TOC History Viewer")
     
-    # Page settings in sidebar
+    # Sidebar settings
     with st.sidebar:
         st.header("Settings")
         wiki_page = st.text_input(
@@ -163,7 +204,6 @@ def main():
             help="Detect and highlight renamed sections"
         )
     
-    # Main content area
     if wiki_page:
         # View mode selection
         view_mode = st.radio(
@@ -172,6 +212,9 @@ def main():
             horizontal=True,
             key="view_mode"
         )
+        
+        # Get sample data (replace with actual API calls later)
+        toc_history = get_sample_data()
         
         # Controls row
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
@@ -184,19 +227,6 @@ def main():
                     value=100,
                     step=10,
                     format="%d%%"
-                )
-        
-        with col2:
-            if view_mode == "Timeline View":
-                st.button("⟲ Reset Zoom")
-        
-        with col3:
-            if view_mode == "Timeline View":
-                st.download_button(
-                    "↓ Download Data",
-                    data="", # TODO: Implement CSV export
-                    file_name="toc_history.csv",
-                    mime="text/csv"
                 )
         
         # Legend for Timeline View
@@ -213,30 +243,22 @@ def main():
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <div style="width: 12px; height: 12px; background-color: #fee2e2; border-radius: 3px;"></div>
-                        <span>Sections to be removed</span>
+                        <span>Removed sections</span>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
         
         # Main content based on view mode
         if view_mode == "Timeline View":
-            # TODO: Implement timeline view with proper styling and zoom
-            pass
-        
-        elif view_mode == "Edit Activity":
-            # Sample data for demonstration
-            toc_history = {
-                "2019": {"sections": [{"title": "Introduction", "isNew": True}]},
-                "2020": {"sections": [{"title": "Introduction"}, {"title": "Methods", "isNew": True}]},
-                "2021": {"sections": [{"title": "Introduction"}, {"title": "Methods", "isRenamed": True}]}
-            }
-            
-            fig = create_edit_activity_heatmap(toc_history)
-            st.plotly_chart(fig, use_container_width=True)
+            timeline_html = render_timeline(toc_history, zoom_level)
+            st.markdown(timeline_html, unsafe_allow_html=True)
         
         elif view_mode == "Section Count":
-            # TODO: Implement section count visualization
-            pass
+            fig = create_section_count_chart(toc_history)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        elif view_mode == "Edit Activity":
+            st.info("Edit Activity view is coming soon!")
 
 if __name__ == "__main__":
     main()

@@ -121,7 +121,7 @@ def extract_toc(wikitext):
 
 def detect_renamed_sections(prev_sections, curr_sections):
     """
-    Detect renamed sections using similarity metrics with lower threshold
+    Detect renamed sections using similarity metrics
     """
     from difflib import SequenceMatcher
     
@@ -137,7 +137,7 @@ def detect_renamed_sections(prev_sections, curr_sections):
         best_score = 0
         for new_section in added_sections:
             sim_score = similarity(old_section, new_section)
-            if sim_score > 0.6 and sim_score > best_score:  # Lower threshold, but take best match
+            if sim_score > 0.6 and sim_score > best_score:
                 best_score = sim_score
                 best_match = new_section
         
@@ -149,16 +149,13 @@ def detect_renamed_sections(prev_sections, curr_sections):
 
 def process_revision_history(title):
     """
-    Process revision history and extract TOC with rename detection
+    Process revision history and extract TOC
     """
     revisions = get_page_history(title)
     
     yearly_revisions = {}
     years_processed = set()
     previous_sections = None
-    
-    # Debug output
-    st.write("Processing revisions for rename detection...")
     
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -169,28 +166,18 @@ def process_revision_history(title):
                 sections = extract_toc(content)
                 current_sections = {s["title"] for s in sections}
                 
-                # Debug output
-                st.write(f"Year {year} sections:", current_sections)
-                
-                # Detect renames if we have previous data
                 renamed_sections = {}
                 removed_sections = set()
                 if previous_sections is not None:
-                    st.write(f"Checking for renames between {year-1} and {year}")
                     renamed_sections = detect_renamed_sections(previous_sections, current_sections)
-                    if renamed_sections:
-                        st.write("Found renames:", renamed_sections)
-                    # Only include truly removed sections (not renamed ones)
                     removed_sections = previous_sections - current_sections - set(renamed_sections.values())
                 
-                # Mark new and renamed sections
                 for section in sections:
                     section_title = section["title"]
                     if previous_sections is None or section_title not in previous_sections:
                         if section_title in renamed_sections:
                             section["isRenamed"] = True
                             section["previousTitle"] = renamed_sections[section_title]
-                            st.write(f"Marked as renamed: {section_title} (was {renamed_sections[section_title]})")
                         else:
                             section["isNew"] = True
                 
@@ -266,19 +253,16 @@ with st.sidebar:
 if wiki_page:
     try:
         with st.spinner("Analyzing page history..."):
-            # Get current TOC first
             current_content = get_revision_content(wiki_page)
             if current_content:
                 st.success("Successfully retrieved current version")
                 current_sections = extract_toc(current_content)
                 
-                # Get historical versions
                 toc_history = process_revision_history(wiki_page)
                 
                 if toc_history:
                     st.success(f"Found historical versions from {len(toc_history)} different years")
                     
-                    # Summary of changes
                     rename_summary = []
                     for year, data in sorted(toc_history.items()):
                         if data.get("renamed"):
@@ -289,10 +273,7 @@ if wiki_page:
                         with st.expander("Section Renames Detected"):
                             for rename in rename_summary:
                                 st.write(rename)
-                    else:
-                        st.info("No section renames were detected in the history.")
                     
-                    # View mode selection
                     view_mode = st.radio(
                         "View Mode",
                         ["Timeline View", "Edit Activity", "Section Count"],
@@ -301,63 +282,6 @@ if wiki_page:
                     )
                     
                     if view_mode == "Timeline View":
-                                                    # Controls section
-                        st.write('<div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">', unsafe_allow_html=True)
-                        
-                        # Make zoom slider more compact
-                        zoom_level = st.slider("Zoom", 50, 200, 100, 10, 
-                                             label_visibility="collapsed",
-                                             key="unique_zoom_slider")
-                        
-                        # Group the buttons horizontally
-                        col1, col2, col3 = st.columns([1, 1, 1])
-                        with col1:
-                            st.button("⟲", key="unique_fit_btn")
-                        with col2:
-                            csv_data = []
-                            for year, data in sorted(toc_history.items()):
-                                for section in data["sections"]:
-                                    csv_data.append({
-                                        'Year': year,
-                                        'Section': section['title'],
-                                        'Level': section['level']
-                                    })
-                            csv_df = pd.DataFrame(csv_data)
-                            st.download_button(
-                                "↓",
-                                data=csv_df.to_csv(index=False),
-                                file_name="toc_history.csv",
-                                mime="text/csv",
-                                key="unique_download_btn",
-                                help="Download data as CSV"
-                            )
-                        st.write('</div>', unsafe_allow_html=True)
-                        
-                        # Add CSS for controls
-                        st.markdown("""
-                            <style>
-                                /* Make slider more compact */
-                                [data-testid="stSlider"] {
-                                    width: 100px !important;
-                                    padding-left: 0 !important;
-                                    padding-right: 0 !important;
-                                }
-                                
-                                /* Fix button layout */
-                                .stButton {
-                                    display: inline-block !important;
-                                }
-                                
-                                /* Ensure buttons are side by side */
-                                [data-testid="column"] {
-                                    padding: 0 !important;
-                                    display: inline-flex !important;
-                                    justify-content: flex-end !important;
-                                }
-                            </style>
-                        """, unsafe_allow_html=True)
-                        
-                        # Custom styling
                         st.markdown(f"""
                             <style>
                                 .stHorizontalBlock {{
@@ -390,6 +314,7 @@ if wiki_page:
                                     margin: 2px 0;
                                 }}
                                 .section-title {{
+                                    display: block;
                                     white-space: nowrap;
                                     overflow: hidden;
                                     text-overflow: ellipsis;
@@ -399,10 +324,13 @@ if wiki_page:
                                     transition: all 0.2s;
                                     position: relative;
                                     z-index: 2;
+                                    max-width: 100%;
+                                    box-sizing: border-box;
                                 }}
                                 .section-title:hover {{
                                     background-color: #f3f4f6;
                                     white-space: normal;
+                                    z-index: 3;
                                 }}
                                 .section-new {{
                                     background-color: #dcfce7 !important;
@@ -419,53 +347,20 @@ if wiki_page:
                                     background-color: #e5e7eb;
                                     z-index: 1;
                                 }}
-                                .legend {{
-                                    display: flex;
-                                    gap: 1rem;
-                                    margin-bottom: 1rem;
-                                    font-size: 0.875rem;
-                                }}
-                                .legend-item {{
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 0.5rem;
-                                }}
-                                .legend-color {{
-                                    width: 12px;
-                                    height: 12px;
-                                    border-radius: 3px;
-                                }}
                             </style>
                         """, unsafe_allow_html=True)
                         
-                        # Add legend
-                        st.markdown("""
-                            <div class="legend">
-                                <div class="legend-item">
-                                    <div class="legend-color" style="background-color: #dcfce7;"></div>
-                                    <span>New sections</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color" style="background-color: #fef3c7;"></div>
-                                    <span>Renamed sections</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-color" style="background-color: #fee2e2;"></div>
-                                    <span>Sections to be removed</span>
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        # Controls for zoom and export
+                        zoom_level = st.slider("Zoom", 50, 200, 100, 10)
                         
-                        # Create columns for timeline view
+                        # Display timeline columns
                         cols = st.columns(len(toc_history))
                         for idx, (year, data) in enumerate(sorted(toc_history.items())):
                             with cols[idx]:
                                 st.markdown(f'<div class="year-header">{year}</div>', 
                                           unsafe_allow_html=True)
                                 
-                                # Display current sections
                                 for section in data["sections"]:
-                                    # Calculate indentation and styling
                                     indent = "&nbsp;" * (4 * (section["level"] - 1))
                                     classes = []
                                     if section.get("isNew"):
@@ -475,7 +370,6 @@ if wiki_page:
                                     
                                     class_str = " ".join(classes)
                                     
-                                    # Display section with proper styling
                                     st.markdown(f"""
                                         <div class="section-container">
                                             {indent}<span class="section-title {class_str}">
@@ -484,7 +378,6 @@ if wiki_page:
                                         </div>
                                     """, unsafe_allow_html=True)
                                 
-                                # Display sections to be removed
                                 if "removed" in data:
                                     for removed_section in data["removed"]:
                                         st.markdown(f"""
@@ -497,7 +390,6 @@ if wiki_page:
                     
                     elif view_mode == "Edit Activity":
                         st.write("Edit Activity view coming soon!")
-                        # TODO: Implement edit activity heatmap
                     
                     elif view_mode == "Section Count":
                         fig = create_section_count_chart(toc_history)

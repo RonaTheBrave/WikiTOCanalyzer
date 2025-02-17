@@ -50,7 +50,7 @@ def get_page_history(title):
         "format": "json",
         "prop": "revisions",
         "titles": title,
-        "rvprop": "ids|timestamp|content",
+        "rvprop": "ids|timestamp|content",  # Make sure 'content' is included
         "rvlimit": "500",
         "formatversion": "2",
         "rvdir": "older"
@@ -239,6 +239,7 @@ def calculate_edit_activity(revisions):
     Calculate edit activity for each section across years
     Returns: Dictionary mapping sections to their edit history
     """
+    st.write(f"Processing {len(revisions)} revisions")  # Debug line
     section_edits = {}
     section_first_seen = {}
     current_year = datetime.now().year
@@ -247,12 +248,15 @@ def calculate_edit_activity(revisions):
     for rev in revisions:
         rev_date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
         year = str(rev_date.year)
+        st.write(f"Processing revision from {year}")  # Debug line
         
         # Get sections from this revision
         try:
             content = rev.get('content', '')
+            st.write(f"Content found: {bool(content)}")  # Debug line
             if content:
                 sections = extract_toc(content)
+                st.write(f"Found {len(sections)} sections")  # Debug line
                 
                 # Update edit counts and first seen dates
                 for section in sections:
@@ -279,6 +283,8 @@ def calculate_edit_activity(revisions):
             st.error(f"Error processing revision: {str(e)}")
             continue
 
+    st.write(f"Completed processing. Found data for {len(section_edits)} sections")  # Debug line
+
     # Format data for visualization
     formatted_data = []
     for title, data in section_edits.items():
@@ -294,6 +300,7 @@ def calculate_edit_activity(revisions):
             "totalEdits": data["totalEdits"]
         })
 
+    st.write(f"Final formatted data contains {len(formatted_data)} entries")  # Debug line
     return formatted_data
 
 

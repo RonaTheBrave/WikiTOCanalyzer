@@ -239,7 +239,6 @@ def calculate_edit_activity(revisions):
     Calculate edit activity for each section across years
     Returns: Dictionary mapping sections to their edit history
     """
-    st.write(f"Processing {len(revisions)} revisions")  # Debug line
     section_edits = {}
     section_first_seen = {}
     current_year = datetime.now().year
@@ -248,15 +247,13 @@ def calculate_edit_activity(revisions):
     for rev in revisions:
         rev_date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
         year = str(rev_date.year)
-        st.write(f"Processing revision from {year}")  # Debug line
         
-        # Get sections from this revision
+        # Get sections from this revision using get_revision_content
         try:
-            content = rev.get('content', '')
-            st.write(f"Content found: {bool(content)}")  # Debug line
+            # Using the same method as Timeline view
+            content = get_revision_content(wiki_page, rev['revid'])
             if content:
                 sections = extract_toc(content)
-                st.write(f"Found {len(sections)} sections")  # Debug line
                 
                 # Update edit counts and first seen dates
                 for section in sections:
@@ -283,12 +280,9 @@ def calculate_edit_activity(revisions):
             st.error(f"Error processing revision: {str(e)}")
             continue
 
-    st.write(f"Completed processing. Found data for {len(section_edits)} sections")  # Debug line
-
     # Format data for visualization
     formatted_data = []
     for title, data in section_edits.items():
-        # Calculate lifespan
         first_year = data["first_seen"]
         lifespan = f"{first_year}-present"
         
@@ -300,8 +294,7 @@ def calculate_edit_activity(revisions):
             "totalEdits": data["totalEdits"]
         })
 
-    st.write(f"Final formatted data contains {len(formatted_data)} entries")  # Debug line
-    return formatted_data
+    return sorted(formatted_data, key=lambda x: x['section'])
 
 
 # Set up Streamlit page
@@ -517,8 +510,7 @@ if wiki_page:
                         
                         # Get real edit activity data
                         revisions = get_page_history(wiki_page)
-                        edit_data = calculate_edit_activity(revisions)
-                        max_edits = 15
+                        edit_data = calculate_edit_activity(revisions)  # The function will use wiki_page internally
                     
                         # Get all years from the data
                         all_years = set()

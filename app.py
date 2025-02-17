@@ -284,9 +284,43 @@ if wiki_page:
                     )
                     
                     if view_mode == "Timeline View":
-                        # Add zoom control before CSS definition
-                        zoom_level = st.slider("Zoom", 50, 200, 100, 10)
-                        
+                        # Controls section
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            zoom_level = st.slider("Zoom", 50, 200, 100, 10)
+                        with col2:
+                            # Prepare CSV data
+                            csv_data = []
+                            for year, data in sorted(toc_history.items()):
+                                for section in data["sections"]:
+                                    csv_data.append({
+                                        'Year': year,
+                                        'Section': section['title'],
+                                        'Level': section['level'],
+                                        'Status': 'New' if section.get('isNew') else 'Existing'
+                                    })
+                            csv_df = pd.DataFrame(csv_data)
+                            st.download_button(
+                                "↓",
+                                data=csv_df.to_csv(index=False),
+                                file_name="toc_history.csv",
+                                mime="text/csv",
+                                help="Download data as CSV"
+                            )
+
+                        # Add legend
+                        st.markdown("""
+                            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 12px; height: 12px; border-radius: 3px; background-color: #dcfce7;"></div>
+                                    <span>New sections</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 12px; height: 12px; border-radius: 3px; background-color: #fee2e2;"></div>
+                                    <span>Sections to be removed</span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
                         st.markdown(f"""
                             <style>
                                 .stHorizontalBlock {{
@@ -406,7 +440,142 @@ if wiki_page:
                                         """, unsafe_allow_html=True)
                     
                     elif view_mode == "Edit Activity":
-                        st.write("Edit Activity view coming soon!")
+                        # Color scaling function
+                        def get_color(value, max_edits=15):
+                            intensity = value / max_edits
+                            rgb_value = round(255 * (1 - intensity))
+                            return f'rgb(255, {rgb_value}, {rgb_value})'
+                        
+                        # Sample data (later we'll replace with real data)
+                        sample_data = [
+                            { 
+                                "section": "Signs and symptoms", 
+                                "level": "*", 
+                                "edits": { "2019": 2, "2020": 1, "2021": 3, "2022": 2, "2023": 1 },
+                                "lifespan": "2019-present",
+                                "totalEdits": 9
+                            },
+                            { 
+                                "section": "Pathophysiology", 
+                                "level": "*", 
+                                "edits": { "2019": 1, "2020": 4, "2021": 2, "2022": 5, "2023": 3 },
+                                "lifespan": "2019-present",
+                                "totalEdits": 15
+                            },
+                            { 
+                                "section": "Mechanism", 
+                                "level": "**", 
+                                "edits": { "2019": 0, "2020": 3, "2021": 2, "2022": 2, "2023": 1 },
+                                "lifespan": "2020-present",
+                                "totalEdits": 8
+                            }
+                        ]  # Add more sample data as needed
+                        
+                        years = ["2019", "2020", "2021", "2022", "2023"]
+                        max_edits = 15
+
+                        # Display color scale legend
+                        st.markdown("""
+                            <style>
+                                .edit-scale {
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    margin-bottom: 16px;
+                                }
+                                .edit-gradient {
+                                    display: flex;
+                                    height: 16px;
+                                    width: 128px;
+                                }
+                                .edit-gradient-box {
+                                    flex: 1;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown(
+                            '<div class="edit-scale">Edit frequency: <span>0</span><div class="edit-gradient">' +
+                            ''.join([f'<div class="edit-gradient-box" style="background-color: {get_color((max_edits/7)*i)}"></div>' for i in range(8)]) +
+                            f'</div><span>{max_edits}+</span></div>',
+                            unsafe_allow_html=True
+                        )
+
+                        # Create table
+                        st.markdown("""
+                            <style>
+                                .edit-table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                }
+                                .edit-table th, .edit-table td {
+                                    padding: 8px;
+                                    text-align: center;
+                                    border: 1px solid #e5e7eb;
+                                }
+                                .edit-table th {
+                                    background-color: #f9fafb;
+                                    font-weight: 500;
+                                }
+                                .edit-cell {
+                                    border-radius: 4px;
+                                    padding: 4px 8px;
+                                }
+                            </style>
+                        """, unsafe_allow_html=True)
+
+                        table_html = """
+                            <div style="overflow-x: auto;">
+                            <table class="edit-table">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left;">Section</th>
+                                        <th style="text-align: left;">Level</th>
+                        """
+                        
+                        # Add year columns
+                        for year in years:
+                            table_html += f'<th>{year}</th>'
+                        
+                        table_html += """
+                                        <th style="text-align: left;">Lifespan</th>
+                                        <th>Total Edits</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        """
+                        
+                        # Add data rows
+                        for row in sample_data:
+                            table_html += f"""
+                                <tr>
+                                    <td style="text-align: left;">{row['section']}</td>
+                                    <td style="text-align: left; font-family: monospace;">{row['level']}</td>
+                            """
+                            
+                            for year in years:
+                                edit_count = row['edits'].get(year, 0)
+                                table_html += f"""
+                                    <td>
+                                        <div class="edit-cell" style="background-color: {get_color(edit_count)}">
+                                            {edit_count}
+                                        </div>
+                                    </td>
+                                """
+                            
+                            table_html += f"""
+                                    <td style="text-align: left;">{row['lifespan']}</td>
+                                    <td style="font-weight: 500;">{row['totalEdits']}</td>
+                                </tr>
+                            """
+                        
+                        table_html += """
+                                </tbody>
+                            </table>
+                            </div>
+                        """
+                        
+                        st.markdown(table_html, unsafe_allow_html=True)
                     
                     elif view_mode == "Section Count":
                         fig = create_section_count_chart(toc_history)

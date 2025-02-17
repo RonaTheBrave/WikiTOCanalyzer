@@ -234,6 +234,69 @@ def create_section_count_chart(toc_history):
     
     return fig
 
+def calculate_edit_activity(revisions):
+    """
+    Calculate edit activity for each section across years
+    Returns: Dictionary mapping sections to their edit history
+    """
+    section_edits = {}
+    section_first_seen = {}
+    current_year = datetime.now().year
+
+    # Process revisions in chronological order
+    for rev in revisions:
+        rev_date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
+        year = str(rev_date.year)
+        
+        # Get sections from this revision
+        try:
+            content = rev.get('content', '')
+            if content:
+                sections = extract_toc(content)
+                
+                # Update edit counts and first seen dates
+                for section in sections:
+                    title = section["title"]
+                    level = "*" * section["level"]
+                    
+                    # Initialize section data if not seen before
+                    if title not in section_edits:
+                        section_edits[title] = {
+                            "section": title,
+                            "level": level,
+                            "edits": {},
+                            "totalEdits": 0,
+                            "first_seen": year
+                        }
+                        section_first_seen[title] = year
+                    
+                    # Increment edit count for this year
+                    if year not in section_edits[title]["edits"]:
+                        section_edits[title]["edits"][year] = 0
+                    section_edits[title]["edits"][year] += 1
+                    section_edits[title]["totalEdits"] += 1
+        except Exception as e:
+            st.error(f"Error processing revision: {str(e)}")
+            continue
+
+    # Format data for visualization
+    formatted_data = []
+    for title, data in section_edits.items():
+        # Calculate lifespan
+        first_year = data["first_seen"]
+        lifespan = f"{first_year}-present"
+        
+        formatted_data.append({
+            "section": data["section"],
+            "level": data["level"],
+            "edits": data["edits"],
+            "lifespan": lifespan,
+            "totalEdits": data["totalEdits"]
+        })
+
+    return formatted_data
+
+
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
@@ -438,7 +501,6 @@ if wiki_page:
                                                 </span>
                                             </div>
                                         """, unsafe_allow_html=True)
-                    
                     elif view_mode == "Edit Activity":
                         # Color scaling function
                         def get_color(value, max_edits=15):
@@ -446,34 +508,17 @@ if wiki_page:
                             rgb_value = round(255 * (1 - intensity))
                             return f'rgb(255, {rgb_value}, {rgb_value})'
                         
-                        # Sample data (later we'll replace with real data)
-                        sample_data = [
-                            { 
-                                "section": "Signs and symptoms", 
-                                "level": "*", 
-                                "edits": { "2019": 2, "2020": 1, "2021": 3, "2022": 2, "2023": 1 },
-                                "lifespan": "2019-present",
-                                "totalEdits": 9
-                            },
-                            { 
-                                "section": "Pathophysiology", 
-                                "level": "*", 
-                                "edits": { "2019": 1, "2020": 4, "2021": 2, "2022": 5, "2023": 3 },
-                                "lifespan": "2019-present",
-                                "totalEdits": 15
-                            },
-                            { 
-                                "section": "Mechanism", 
-                                "level": "**", 
-                                "edits": { "2019": 0, "2020": 3, "2021": 2, "2022": 2, "2023": 1 },
-                                "lifespan": "2020-present",
-                                "totalEdits": 8
-                            }
-                        ]  # Add more sample data as needed
-                        
-                        years = ["2019", "2020", "2021", "2022", "2023"]
+                        # Get real edit activity data
+                        revisions = get_page_history(wiki_page)
+                        edit_data = calculate_edit_activity(revisions)
                         max_edits = 15
-
+                    
+                        # Get all years from the data
+                        all_years = set()
+                        for item in edit_data:
+                            all_years.update(item["edits"].keys())
+                        years = sorted(list(all_years))
+                    
                         # Display color scale legend
                         st.markdown("""
                             <style>
@@ -500,7 +545,7 @@ if wiki_page:
                             f'</div><span>{max_edits}+</span></div>',
                             unsafe_allow_html=True
                         )
-
+                    
                         # Create table
                         st.markdown("""
                             <style>
@@ -523,7 +568,7 @@ if wiki_page:
                                 }
                             </style>
                         """, unsafe_allow_html=True)
-
+                    
                         table_html = """
                             <div style="overflow-x: auto;">
                             <table class="edit-table">
@@ -546,7 +591,7 @@ if wiki_page:
                         """
                         
                         # Add data rows
-                        for row in sample_data:
+                        for row in edit_data:
                             table_html += f"""
                                 <tr>
                                     <td style="text-align: left;">{row['section']}</td>

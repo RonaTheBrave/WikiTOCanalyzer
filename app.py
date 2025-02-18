@@ -50,7 +50,7 @@ def get_page_history(title):
         "format": "json",
         "prop": "revisions",
         "titles": title,
-        "rvprop": "ids|timestamp|content",  # Make sure 'content' is included
+        "rvprop": "ids|timestamp|content",
         "rvlimit": "500",
         "formatversion": "2",
         "rvdir": "older"
@@ -377,6 +377,7 @@ if wiki_page:
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
+                        
                         st.markdown(f"""
                             <style>
                                 .stHorizontalBlock {{
@@ -494,11 +495,11 @@ if wiki_page:
                                                 </span>
                                             </div>
                                         """, unsafe_allow_html=True)
-                                        
+                    
                     elif view_mode == "Edit Activity":
                         # Define constants first
                         max_edits = 15
-                    
+
                         # Color scaling function
                         def get_color(value, max_edits=15):
                             intensity = value / max_edits
@@ -518,7 +519,7 @@ if wiki_page:
                             for item in edit_data:
                                 all_years.update(item["edits"].keys())
                             years = sorted(list(all_years))
-                    
+
                             # Display color scale legend
                             st.markdown("""
                                 <style>
@@ -545,7 +546,7 @@ if wiki_page:
                                 f'</div><span>{max_edits}+</span></div>',
                                 unsafe_allow_html=True
                             )
-                    
+
                             # Create table
                             st.markdown("""
                                 <style>
@@ -568,7 +569,7 @@ if wiki_page:
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
-                    
+
                             table_html = """
                                 <div style="overflow-x: auto;">
                                 <table class="edit-table">
@@ -621,15 +622,15 @@ if wiki_page:
                             """
                             
                             st.markdown(table_html, unsafe_allow_html=True)
-                        
-                        elif view_mode == "Section Count":
-                            fig = create_section_count_chart(toc_history)
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        else:
-                            st.warning("No historical versions found.")
-                    else:
-                        st.error("Could not retrieve page content.")
+                    
+                    elif view_mode == "Section Count":
+                        fig = create_section_count_chart(toc_history)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                else:
+                    st.warning("No historical versions found.")
+            else:
+                st.error("Could not retrieve page content.")
 
     except Exception as e:
         st.error(f"Error: {str(e)}")

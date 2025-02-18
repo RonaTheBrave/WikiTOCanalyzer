@@ -501,23 +501,31 @@ if wiki_page:
                                                 </span>
                                             </div>
                                         """, unsafe_allow_html=True)
-                    elif view_mode == "Edit Activity":
-                        # Color scaling function
-                        def get_color(value, max_edits=15):
-                            intensity = value / max_edits
-                            rgb_value = round(255 * (1 - intensity))
-                            return f'rgb(255, {rgb_value}, {rgb_value})'
-                        
-                        # Get real edit activity data
-                        revisions = get_page_history(wiki_page)
-                        edit_data = calculate_edit_activity(revisions)  # The function will use wiki_page internally
+                                        
+                elif view_mode == "Edit Activity":
+                    # Define constants first
+                    max_edits = 15
+                
+                    # Color scaling function
+                    def get_color(value, max_edits=15):
+                        intensity = value / max_edits
+                        rgb_value = round(255 * (1 - intensity))
+                        return f'rgb(255, {rgb_value}, {rgb_value})'
                     
+                    # Get real edit activity data
+                    revisions = get_page_history(wiki_page)
+                    st.write("Calculating edit activity...")
+                    edit_data = calculate_edit_activity(revisions, wiki_page)
+                    
+                    if not edit_data:
+                        st.warning("No edit activity data found.")
+                    else:
                         # Get all years from the data
                         all_years = set()
                         for item in edit_data:
                             all_years.update(item["edits"].keys())
                         years = sorted(list(all_years))
-                    
+                
                         # Display color scale legend
                         st.markdown("""
                             <style>
@@ -544,7 +552,7 @@ if wiki_page:
                             f'</div><span>{max_edits}+</span></div>',
                             unsafe_allow_html=True
                         )
-                    
+                
                         # Create table
                         st.markdown("""
                             <style>
@@ -567,7 +575,7 @@ if wiki_page:
                                 }
                             </style>
                         """, unsafe_allow_html=True)
-                    
+                
                         table_html = """
                             <div style="overflow-x: auto;">
                             <table class="edit-table">

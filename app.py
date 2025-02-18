@@ -234,51 +234,45 @@ def create_section_count_chart(toc_history):
     
     return fig
 
-def calculate_edit_activity(revisions):
+def calculate_edit_activity(revisions, title):
     """
     Calculate edit activity for each section across years
     Returns: Dictionary mapping sections to their edit history
     """
     section_edits = {}
     section_first_seen = {}
-    current_year = datetime.now().year
 
     # Process revisions in chronological order
-    for rev in revisions:
-        rev_date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
-        year = str(rev_date.year)
+    for rev in reversed(revisions):  # Reversed to match Timeline view's order
+        year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
         
-        # Get sections from this revision using get_revision_content
-        try:
-            # Using the same method as Timeline view
-            content = get_revision_content(wiki_page, rev['revid'])
-            if content:
-                sections = extract_toc(content)
+        # Use the same content fetching approach as Timeline view
+        content = get_revision_content(title, rev['revid'])
+        if content:
+            sections = extract_toc(content)
+            year_str = str(year)
+            
+            # Update edit counts and first seen dates
+            for section in sections:
+                title = section["title"]
+                level = "*" * section["level"]
                 
-                # Update edit counts and first seen dates
-                for section in sections:
-                    title = section["title"]
-                    level = "*" * section["level"]
-                    
-                    # Initialize section data if not seen before
-                    if title not in section_edits:
-                        section_edits[title] = {
-                            "section": title,
-                            "level": level,
-                            "edits": {},
-                            "totalEdits": 0,
-                            "first_seen": year
-                        }
-                        section_first_seen[title] = year
-                    
-                    # Increment edit count for this year
-                    if year not in section_edits[title]["edits"]:
-                        section_edits[title]["edits"][year] = 0
-                    section_edits[title]["edits"][year] += 1
-                    section_edits[title]["totalEdits"] += 1
-        except Exception as e:
-            st.error(f"Error processing revision: {str(e)}")
-            continue
+                # Initialize section data if not seen before
+                if title not in section_edits:
+                    section_edits[title] = {
+                        "section": title,
+                        "level": level,
+                        "edits": {},
+                        "totalEdits": 0,
+                        "first_seen": year_str
+                    }
+                    section_first_seen[title] = year_str
+                
+                # Increment edit count for this year
+                if year_str not in section_edits[title]["edits"]:
+                    section_edits[title]["edits"][year_str] = 0
+                section_edits[title]["edits"][year_str] += 1
+                section_edits[title]["totalEdits"] += 1
 
     # Format data for visualization
     formatted_data = []
@@ -295,7 +289,6 @@ def calculate_edit_activity(revisions):
         })
 
     return sorted(formatted_data, key=lambda x: x['section'])
-
 
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")

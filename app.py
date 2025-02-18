@@ -629,9 +629,9 @@ if wiki_page:
                         
                         st.markdown(table_html, unsafe_allow_html=True)
                     
-                    elif view_mode == "Section Count":
-                        fig = create_section_count_chart(toc_history)
-                        st.plotly_chart(fig, use_container_width=True)
+                elif view_mode == "Section Count":
+                    fig = create_section_count_chart(toc_history)
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 else:
                     st.warning("No historical versions found.")

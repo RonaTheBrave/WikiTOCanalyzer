@@ -197,39 +197,38 @@ def process_revision_history(title):
 
 def create_section_count_chart(toc_history):
     """
-    Create section count visualization
+    Create section count visualization with level breakdown
     """
-    counts = []
-    for year, data in sorted(toc_history.items()):
-        total = len(data["sections"])
-        new = len([s for s in data["sections"] if s.get("isNew", True)])
-        counts.append({
-            "Year": year,
-            "Total Sections": total,
-            "New Sections": new
-        })
+    data = []
+    for year, content in sorted(toc_history.items()):
+        level_counts = {}
+        for section in content["sections"]:
+            level = section["level"]
+            level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
+        
+        row = {"Year": year}
+        row.update(level_counts)
+        data.append(row)
     
+    df = pd.DataFrame(data)
+    
+    # Create stacked bar chart
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=[c["Year"] for c in counts],
-        y=[c["Total Sections"] for c in counts],
-        name="Total Sections",
-        marker_color='rgb(55, 83, 109)'
-    ))
-    fig.add_trace(go.Bar(
-        x=[c["Year"] for c in counts],
-        y=[c["New Sections"] for c in counts],
-        name="New Sections",
-        marker_color='rgb(26, 118, 255)'
-    ))
+    for level in [col for col in df.columns if col.startswith("Level ")]:
+        fig.add_trace(go.Bar(
+            name=level,
+            x=df["Year"],
+            y=df[level],
+            hovertemplate="Level %{y}<extra></extra>"
+        ))
     
     fig.update_layout(
-        title="Section Count Evolution",
+        title="Section Count by Level",
         xaxis_title="Year",
         yaxis_title="Number of Sections",
-        barmode='group',
-        bargap=0.15,
-        bargroupgap=0.1
+        barmode='stack',
+        showlegend=True,
+        hovermode='x'
     )
     
     return fig
@@ -648,6 +647,29 @@ if wiki_page:
                             st.markdown(table_html, unsafe_allow_html=True)
                     
                     elif view_mode == "Section Count":
+                        # Prepare CSV data
+                        csv_data = []
+                        for year, content in sorted(toc_history.items()):
+                            level_counts = {}
+                            for section in content["sections"]:
+                                level = section["level"]
+                                level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
+                            row = {"Year": year}
+                            row.update(level_counts)
+                            csv_data.append(row)
+                        
+                        csv_df = pd.DataFrame(csv_data)
+                        
+                        col1, col2 = st.columns([6, 1])
+                        with col2:
+                            st.download_button(
+                                "↓",
+                                data=csv_df.to_csv(index=False),
+                                file_name="section_counts.csv",
+                                mime="text/csv",
+                                help="Download data as CSV"
+                            )
+                        
                         fig = create_section_count_chart(toc_history)
                         st.plotly_chart(fig, use_container_width=True)
                 

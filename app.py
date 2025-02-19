@@ -573,6 +573,27 @@ if wiki_page:
                                 unsafe_allow_html=True
                             )
 
+                            # Add control buttons row
+                            controls_col1, controls_col2, controls_col3, _ = st.columns([1, 1, 2, 4])
+                            with controls_col1:
+                                st.button("⟲ Fit", key="fit_table_ea", help="Fit table to screen width")
+                            with controls_col2:
+                                st.button("💾", key="save_table", help="Save as image")
+                            with controls_col3:
+                                sort_by = st.selectbox(
+                                    "Sort by",
+                                    ["Section Name", "Total Edits", "First Appearance"],
+                                    key="sort_heatmap"
+                                )
+
+                            # Sort data based on selection
+                            if sort_by == "Section Name":
+                                edit_data = sorted(edit_data, key=lambda x: x['section'].lower())
+                            elif sort_by == "Total Edits":
+                                edit_data = sorted(edit_data, key=lambda x: x['totalEdits'], reverse=True)
+                            elif sort_by == "First Appearance":
+                                edit_data = sorted(edit_data, key=lambda x: x['lifespan'].split('-')[0])
+
                             # Create table
                             st.markdown("""
                                 <style>

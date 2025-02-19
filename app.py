@@ -625,7 +625,8 @@ if wiki_page:
                                 
                                 for year in years:
                                     edit_count = row['edits'].get(year, None)
-                                    if edit_count is None and year < row['first_seen']:
+                                    first_year = row['lifespan'].split('-')[0]  # Extract first year from lifespan
+                                    if edit_count is None and year < first_year:
                                         display_value = "N/A"
                                         bg_color = "#f3f4f6"  # Light gray for non-existent
                                     else:

@@ -219,7 +219,7 @@ def create_section_count_chart(toc_history):
             name=level,
             x=df["Year"],
             y=df[level],
-            hovertemplate="Level %{y}<extra></extra>"
+            hovertemplate="Count %{y}<extra></extra>"
         ))
     
     fig.update_layout(

@@ -593,26 +593,16 @@ if wiki_page:
                             
                             # Add data rows
                             for row in edit_data:
-                                table_html += f"""
-                                    <tr>
-                                        <td style="text-align: left;">{row['section']}</td>
-                                        <td style="text-align: left; font-family: monospace;">{row['level']}</td>
-                                """
+                                table_html += f'<tr><td style="text-align: left;">{row["section"]}</td>'
+                                table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'
                                 
                                 for year in years:
                                     edit_count = row['edits'].get(year, 0)
-                                    table_html += f"""
-                                        <td>
-                                            <div class="edit-cell" style="background-color: {get_color(edit_count)}">
-                                                {edit_count}
-                                            </div>
-                                        </td>
-                                    """
+                                    table_html += f'<td><div class="edit-cell" style="background-color: {get_color(edit_count)}">{edit_count}</div></td>'
                                 
-                                table_html += f"""
-                                        <td style="text-align: left;">{row['lifespan']}</td>
-                                        <td style="font-weight: 500;">{row['totalEdits']}</td>
-                                    </tr>
+                                table_html += f'<td style="text-align: left;">{row["lifespan"]}</td>'
+                                table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'
+                                
                                 """
                             
                             table_html += """

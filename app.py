@@ -496,7 +496,6 @@ if wiki_page:
                                                 </span>
                                             </div>
                                         """, unsafe_allow_html=True)
-                    
                     elif view_mode == "Edit Activity":
                         # Define constants first
                         max_edits = 15
@@ -515,7 +514,13 @@ if wiki_page:
                         if not edit_data:
                             st.warning("No edit activity data found.")
                         else:
-                            # Controls row
+                            # Get all years from the data FIRST
+                            all_years = set()
+                            for item in edit_data:
+                                all_years.update(item["edits"].keys())
+                            years = sorted(list(all_years))
+
+                            # Then add controls row
                             col1, col2 = st.columns([6, 1])
                             with col2:
                                 st.button("⟲ Fit", key="fit_table", help="Fit table to screen width")
@@ -541,12 +546,6 @@ if wiki_page:
                                     mime="text/csv",
                                     help="Download data as CSV"
                                 )
-
-                            # Get all years from the data
-                            all_years = set()
-                            for item in edit_data:
-                                all_years.update(item["edits"].keys())
-                            years = sorted(list(all_years))
                             
                             # Display color scale legend
                             st.markdown("""

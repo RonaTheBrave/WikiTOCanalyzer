@@ -307,6 +307,14 @@ with st.sidebar:
     
     show_renames = st.toggle("Enable Rename Detection", True,
                            help="When enabled, detects and highlights sections that were renamed")
+    
+    st.divider()  # Add a visual separator
+    
+    view_mode = st.radio(
+        "Analysis Mode",
+        ["Timeline View", "Edit Activity", "Section Count"],
+        key="view_mode"
+    )
 
 if wiki_page:
     try:
@@ -331,13 +339,6 @@ if wiki_page:
                         with st.expander("Section Renames Detected"):
                             for rename in rename_summary:
                                 st.write(rename)
-                    
-                    view_mode = st.radio(
-                        "View Mode",
-                        ["Timeline View", "Edit Activity", "Section Count"],
-                        horizontal=True,
-                        key="view_mode"
-                    )
                     
                     if view_mode == "Timeline View":
                         # Controls section
@@ -514,12 +515,39 @@ if wiki_page:
                         if not edit_data:
                             st.warning("No edit activity data found.")
                         else:
+                            # Controls row
+                            col1, col2 = st.columns([6, 1])
+                            with col2:
+                                st.button("⟲ Fit", key="fit_table", help="Fit table to screen width")
+                            with col1:
+                                # Prepare CSV data
+                                csv_data = []
+                                for row in edit_data:
+                                    csv_row = {
+                                        'Section': row['section'],
+                                        'Level': row['level'],
+                                        'Lifespan': row['lifespan'],
+                                        'Total Edits': row['totalEdits']
+                                    }
+                                    # Add year columns
+                                    for year in years:
+                                        csv_row[year] = row['edits'].get(year, 'N/A')
+                                    csv_data.append(csv_row)
+                                csv_df = pd.DataFrame(csv_data)
+                                st.download_button(
+                                    "↓ Download Data",
+                                    data=csv_df.to_csv(index=False),
+                                    file_name="section_edits.csv",
+                                    mime="text/csv",
+                                    help="Download data as CSV"
+                                )
+
                             # Get all years from the data
                             all_years = set()
                             for item in edit_data:
                                 all_years.update(item["edits"].keys())
                             years = sorted(list(all_years))
-
+                            
                             # Display color scale legend
                             st.markdown("""
                                 <style>
@@ -597,8 +625,15 @@ if wiki_page:
                                 table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'
                                 
                                 for year in years:
-                                    edit_count = row['edits'].get(year, 0)
-                                    table_html += f'<td><div class="edit-cell" style="background-color: {get_color(edit_count)}">{edit_count}</div></td>'
+                                    edit_count = row['edits'].get(year, None)
+                                    if edit_count is None and year < row['first_seen']:
+                                        display_value = "N/A"
+                                        bg_color = "#f3f4f6"  # Light gray for non-existent
+                                    else:
+                                        edit_count = edit_count or 0  # Convert None to 0 for existing sections
+                                        display_value = str(edit_count)
+                                        bg_color = get_color(edit_count)
+                                    table_html += f'<td><div class="edit-cell" style="background-color: {bg_color}">{display_value}</div></td>'
                                 
                                 table_html += f'<td style="text-align: left;">{row["lifespan"]}</td>'
                                 table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'

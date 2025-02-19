@@ -603,7 +603,6 @@ if wiki_page:
                                 table_html += f'<td style="text-align: left;">{row["lifespan"]}</td>'
                                 table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'
                                 
-                                """
                             
                             table_html += """
                                     </tbody>

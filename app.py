@@ -130,10 +130,26 @@ def detect_renamed_sections(prev_sections, curr_sections):
     
     def similarity(a, b):
         return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+    # Convert to lowercase for initial comparison
+    prev_lower = {s.lower() for s in prev_sections}
+    curr_lower = {s.lower() for s in curr_sections}
     
-    renamed_sections = {}
+    # Create mapping of lowercase to original case
+    prev_case_map = {s.lower(): s for s in prev_sections}
+    curr_case_map = {s.lower(): s for s in curr_sections}
+    
+    # Find sections that differ only in case
+    case_renames = {}
+    for s in prev_lower & curr_lower:
+        if prev_case_map[s] != curr_case_map[s]:
+            case_renames[curr_case_map[s]] = prev_case_map[s]
+    
+    # Find other renamed sections
     removed_sections = prev_sections - curr_sections
-    added_sections = curr_sections - prev_sections
+    added_sections = curr_sections - curr_sections.intersection(case_renames.keys())
+    
+    renamed_sections = case_renames.copy()
     
     for old_section in removed_sections:
         best_match = None

@@ -240,30 +240,45 @@ def calculate_edit_activity(revisions, title):
     """
     section_edits = {}
     section_first_seen = {}
+    rename_history = {}  # Track rename history
 
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
+        year_str = str(year)
         
-        # Use the same content fetching approach as Timeline view
         content = get_revision_content(title, rev['revid'])
         if content:
             sections = extract_toc(content)
-            year_str = str(year)
             
-            # Update edit counts and first seen dates
+            # Update edit counts and track renames
             for section in sections:
                 title = section["title"]
                 level = "*" * section["level"]
                 
-                # Initialize section data if not seen before
+                # Check if this is a renamed section
+                if section.get("isRenamed"):
+                    old_title = section["previousTitle"]
+                    # Update rename history
+                    if title not in rename_history:
+                        rename_history[title] = [(old_title, year_str)]
+                    # Transfer data from old section to new
+                    if old_title in section_edits:
+                        if title not in section_edits:
+                            section_edits[title] = section_edits[old_title].copy()
+                            section_edits[title]["section"] = title
+                            section_first_seen[title] = section_first_seen[old_title]
+                        del section_edits[old_title]
+                
+                # Initialize or update section data
                 if title not in section_edits:
                     section_edits[title] = {
                         "section": title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
-                        "first_seen": year_str
+                        "first_seen": year_str,
+                        "rename_history": rename_history.get(title, [])
                     }
                     section_first_seen[title] = year_str
                 
@@ -273,22 +288,23 @@ def calculate_edit_activity(revisions, title):
                 section_edits[title]["edits"][year_str] += 1
                 section_edits[title]["totalEdits"] += 1
 
-    # Format data for visualization
+    # Format data for visualization with rename info
     formatted_data = []
     for title, data in section_edits.items():
         first_year = data["first_seen"]
         lifespan = f"{first_year}-present"
         
         formatted_data.append({
-            "section": data["section"],
+            "section": title,
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,
-            "totalEdits": data["totalEdits"]
+            "totalEdits": data["totalEdits"],
+            "rename_history": data.get("rename_history", [])
         })
 
     return sorted(formatted_data, key=lambda x: x['section'])
-
+    
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
@@ -640,7 +656,13 @@ if wiki_page:
                             
                             # Add data rows
                             for row in edit_data:
-                                table_html += f'<tr><td style="text-align: left;">{row["section"]}</td>'
+                                # Add rename history indicator if exists
+                                rename_info = ""
+                                if row.get('rename_history'):
+                                    changes = [f"{old} ({year})" for old, year in row['rename_history']]
+                                    rename_info = f' <span style="color: #9333ea; font-size: 0.8em;">↳ {", ".join(changes)}</span>'
+                                
+                                table_html += f'<tr><td style="text-align: left;">{row["section"]}{rename_info}</td>'
                                 table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'
                                 
                                 for year in years:

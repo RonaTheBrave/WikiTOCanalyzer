@@ -250,16 +250,11 @@ def create_section_count_chart(toc_history):
     return fig
 
 def calculate_edit_activity(revisions, title):
-    """
-    Calculate edit activity for each section across years
-    Returns: Dictionary mapping sections to their edit history
-    """
     section_edits = {}
     section_first_seen = {}
-    rename_history = {}  # Track rename history
+    rename_chains = {}  # Track complete rename history
 
-    # Process revisions in chronological order
-    for rev in reversed(revisions):  # Reversed to match Timeline view's order
+    for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
         year_str = str(year)
         
@@ -267,59 +262,64 @@ def calculate_edit_activity(revisions, title):
         if content:
             sections = extract_toc(content)
             
-            # Update edit counts and track renames
             for section in sections:
-                title = section["title"]
+                curr_title = section["title"]
                 level = "*" * section["level"]
                 
-                # Check if this is a renamed section
                 if section.get("isRenamed"):
                     old_title = section["previousTitle"]
-                    # Update rename history
-                    if title not in rename_history:
-                        rename_history[title] = [(old_title, year_str)]
-                    # Transfer data from old section to new
+                    
+                    # Update rename chains
+                    if old_title in rename_chains:
+                        # If old title was already part of a chain, add new title to that chain
+                        chain = rename_chains[old_title]
+                        rename_chains[curr_title] = chain
+                        chain.append((old_title, year_str))
+                    else:
+                        # Start new chain
+                        rename_chains[curr_title] = [(old_title, year_str)]
+                    
+                    # Merge edit histories
                     if old_title in section_edits:
-                        if title not in section_edits:
-                            section_edits[title] = section_edits[old_title].copy()
-                            section_edits[title]["section"] = title
-                            section_first_seen[title] = section_first_seen[old_title]
+                        if curr_title not in section_edits:
+                            section_edits[curr_title] = section_edits[old_title].copy()
+                            section_edits[curr_title]["section"] = curr_title
+                            section_first_seen[curr_title] = section_first_seen[old_title]
+                            # Copy complete rename history
+                            old_history = section_edits[old_title].get("rename_history", [])
+                            section_edits[curr_title]["rename_history"] = old_history + [(old_title, year_str)]
                         del section_edits[old_title]
                 
                 # Initialize or update section data
-                if title not in section_edits:
-                    section_edits[title] = {
-                        "section": title,
+                if curr_title not in section_edits:
+                    section_edits[curr_title] = {
+                        "section": curr_title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(title, [])
+                        "rename_history": rename_chains.get(curr_title, [])
                     }
-                    section_first_seen[title] = year_str
+                    section_first_seen[curr_title] = year_str
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[title]["edits"]:
-                    section_edits[title]["edits"][year_str] = 0
-                section_edits[title]["edits"][year_str] += 1
-                section_edits[title]["totalEdits"] += 1
+                if year_str not in section_edits[curr_title]["edits"]:
+                    section_edits[curr_title]["edits"][year_str] = 0
+                section_edits[curr_title]["edits"][year_str] += 1
+                section_edits[curr_title]["totalEdits"] += 1
 
-    # Format data for visualization with rename info
     formatted_data = []
-    for title, data in section_edits.items():
-        first_year = data["first_seen"]
-        lifespan = f"{first_year}-present"
-        
+    for curr_title, data in section_edits.items():
         formatted_data.append({
-            "section": title,
+            "section": curr_title,
             "level": data["level"],
             "edits": data["edits"],
-            "lifespan": lifespan,
+            "lifespan": f"{data['first_seen']}-present",
             "totalEdits": data["totalEdits"],
             "rename_history": data.get("rename_history", [])
         })
 
-    return sorted(formatted_data, key=lambda x: x['section'])
+    return sorted(formatted_data, key=lambda x: x['section'].lower())
     
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
@@ -648,7 +648,28 @@ if wiki_page:
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
-
+                            
+                            # Add rename chain styles
+                            st.markdown("""
+                                <style>
+                                    .rename-chain {
+                                        color: #9333ea;
+                                        font-size: 0.8em;
+                                        margin-top: 2px;
+                                        padding-left: 12px;
+                                        border-left: 2px solid #e5e7eb;
+                                    }
+                                    .rename-step {
+                                        display: block;
+                                        padding: 2px 0;
+                                    }
+                                    .rename-arrow {
+                                        color: #9333ea;
+                                        margin-right: 4px;
+                                    }
+                                </style>
+                            """, unsafe_allow_html=True)
+                            
                             table_html = """
                                 <div style="overflow-x: auto;">
                                 <table class="edit-table">

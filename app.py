@@ -669,7 +669,7 @@ if wiki_page:
                                     z-index: 100;
                                     bottom: 125%;
                                     left: 50%;
-                                    margin-left: -90px;
+                                    margin-left: calc(-90px);
                                     opacity: 0;
                                     transition: opacity 0.3s;
                                     font-size: 10px;

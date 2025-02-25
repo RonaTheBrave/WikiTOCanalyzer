@@ -902,13 +902,14 @@ if wiki_page:
                                     <tbody>
                             """
                             
+                            
                             # Add data rows
                             for row in edit_data:
                                 # Add rename history indicator if exists
                                 rename_info = ""
-                                if row.get('rename_history'):
+                                if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
                                     changes = [f"{old} ({year})" for old, year in row['rename_history']]
-                                    rename_info = f' <span style="color: #9333ea; font-size: 0.8em;">↳ {", ".join(changes)}</span>'
+                                    rename_info = f' <span style="color: #9333ea; font-size: 0.8em; padding: 2px 4px; background-color: #f3e8ff; border-radius: 3px; margin-left: 4px;">↺ {", ".join(changes)}</span>'
                                 
                                 table_html += f'<tr><td style="text-align: left;">{row["section"]}{rename_info}</td>'
                                 table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'
@@ -916,16 +917,31 @@ if wiki_page:
                                 for year in years:
                                     edit_count = row['edits'].get(year, None)
                                     first_year = row['lifespan'].split('-')[0]  # Extract first year from lifespan
-                                    if edit_count is None and year < first_year:
+                                    
+                                    # Check if the section exists in this year
+                                    section_exists = True
+                                    if year < first_year:
+                                        section_exists = False
+                                    
+                                    # Check if this section was removed in a specific year
+                                    # Look for year in TOC history where this section doesn't exist
+                                    if toc_history and year in toc_history:
+                                        current_year_data = toc_history[year]
+                                        section_titles = {s["title"].lower() for s in current_year_data["sections"]}
+                                        
+                                        # If section doesn't exist in this year's TOC and it's after first appearance
+                                        if row['section'].lower() not in section_titles and year > first_year:
+                                            section_exists = False
+                                    
+                                    if not section_exists:
                                         display_value = "N/A"
                                         bg_color = "#f3f4f6"  # Light gray for non-existent
                                     else:
                                         edit_count = edit_count or 0  # Convert None to 0 for existing sections
                                         display_value = str(edit_count)
                                         bg_color = get_color(edit_count)
+                                    
                                     table_html += f'<td><div class="edit-cell" style="background-color: {bg_color}">{display_value}</div></td>'
-                                
-                                table_html += f'<td style="text-align: left;">{row["lifespan"]}</td>'
                                 table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'
                                 
                             

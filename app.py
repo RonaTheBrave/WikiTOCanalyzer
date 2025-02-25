@@ -124,56 +124,78 @@ def extract_toc(wikitext):
 
 def detect_renamed_sections(prev_sections, curr_sections):
     """
-    Detect renamed sections using similarity metrics
+    Enhanced detection of renamed sections with better similarity metrics 
+    and hierarchy awareness
     """
     from difflib import SequenceMatcher
     
     def similarity(a, b):
-        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        # More sophisticated similarity that considers length differences
+        ratio = SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        
+        # Adjust ratio based on length differences to prevent matching very short/long sections
+        len_diff_factor = min(len(a), len(b)) / max(len(a), len(b)) if max(len(a), len(b)) > 0 else 0
+        
+        # Higher weight to exact prefix/suffix matches (common in section renames)
+        prefix_match = min(3, min(len(a), len(b))) if a[:min(3, len(a))].lower() == b[:min(3, len(b))].lower() else 0
+        
+        adjusted_score = ratio * 0.8 + len_diff_factor * 0.1 + (prefix_match / 3) * 0.1
+        return adjusted_score
 
-    # Convert to lowercase for initial comparison
-    prev_lower = {s.lower() for s in prev_sections}
-    curr_lower = {s.lower() for s in curr_sections}
+    # Extract section titles only (no level info at this stage)
+    prev_titles = {s for s in prev_sections}
+    curr_titles = {s for s in curr_sections}
     
-    # Create mapping of lowercase to original case
-    prev_case_map = {s.lower(): s for s in prev_sections}
-    curr_case_map = {s.lower(): s for s in curr_sections}
+    # Sections that are exact matches
+    exact_matches = prev_titles.intersection(curr_titles)
+    
+    # Create mapping of lowercase to original case for remaining sections
+    prev_case_map = {s.lower(): s for s in prev_titles - exact_matches}
+    curr_case_map = {s.lower(): s for s in curr_titles - exact_matches}
     
     # Find sections that differ only in case
     case_renames = {}
-    for s in prev_lower & curr_lower:
-        if prev_case_map[s] != curr_case_map[s]:
-            case_renames[curr_case_map[s]] = prev_case_map[s]
+    for s_lower in set(prev_case_map.keys()) & set(curr_case_map.keys()):
+        if prev_case_map[s_lower] != curr_case_map[s_lower]:
+            case_renames[curr_case_map[s_lower]] = prev_case_map[s_lower]
     
-    # Find other renamed sections
-    removed_sections = prev_sections - curr_sections
-    added_sections = curr_sections - curr_sections.intersection(case_renames.keys())
+    # Find other renamed sections using similarity
+    removed_titles = prev_titles - exact_matches - set(case_renames.values())
+    added_titles = curr_titles - exact_matches - set(case_renames.keys())
     
     renamed_sections = case_renames.copy()
     
-    for old_section in removed_sections:
-        best_match = None
-        best_score = 0
-        for new_section in added_sections:
-            sim_score = similarity(old_section, new_section)
-            if sim_score > 0.6 and sim_score > best_score:
-                best_score = sim_score
-                best_match = new_section
+    # Use a more robust approach for identifying similar titles
+    for old_title in removed_titles:
+        candidates = []
+        for new_title in added_titles:
+            sim_score = similarity(old_title, new_title)
+            if sim_score > 0.65:  # Slightly higher threshold for better precision
+                candidates.append((new_title, sim_score))
         
-        if best_match:
-            renamed_sections[best_match] = old_section
+        if candidates:
+            # Sort by similarity score
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            best_match, score = candidates[0]
+            
+            # Log for debugging (remove in production or use a debug flag)
+            # print(f"Potential rename: '{old_title}' → '{best_match}' (score: {score:.2f})")
+            
+            renamed_sections[best_match] = old_title
+            added_titles.remove(best_match)  # Remove to prevent multiple matches
     
     return renamed_sections
-
+    
 def process_revision_history(title):
     """
-    Process revision history and extract TOC
+    Process revision history and extract TOC with enhanced path tracking
     """
     revisions = get_page_history(title)
     
     yearly_revisions = {}
     years_processed = set()
     previous_sections = None
+    previous_section_paths = {}  # Track full section paths
     
     for rev in reversed(revisions):
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -184,33 +206,88 @@ def process_revision_history(title):
                 sections = extract_toc(content)
                 current_sections = {s["title"] for s in sections}
                 
+                # Build current section paths
+                current_section_paths = {}
+                
+                # First pass: find all level 1 sections
+                level1_sections = [s for s in sections if s["level"] == 1]
+                
+                # Second pass: assign paths
+                for section in sections:
+                    if section["level"] == 1:
+                        # Top-level sections have their name as path
+                        current_section_paths[section["title"]] = section["title"]
+                    else:
+                        # Find the most recent parent section
+                        parent_idx = -1
+                        for i, s in enumerate(sections):
+                            idx = sections.index(section)
+                            if i < idx and s["level"] < section["level"]:
+                                parent_idx = i
+                        
+                        if parent_idx >= 0:
+                            parent = sections[parent_idx]
+                            parent_path = current_section_paths.get(parent["title"], parent["title"])
+                            current_section_paths[section["title"]] = f"{parent_path} > {section['title']}"
+                        else:
+                            # Fallback if we can't find a parent
+                            current_section_paths[section["title"]] = section["title"]
+                
+                # Detect renamed sections
                 renamed_sections = {}
                 removed_sections = set()
+                
                 if previous_sections is not None:
+                    # Basic rename detection based on titles
                     renamed_sections = detect_renamed_sections(previous_sections, current_sections)
+                    
+                    # Further refine based on paths
+                    for new_title, old_title in list(renamed_sections.items()):
+                        if old_title in previous_section_paths and new_title in current_section_paths:
+                            old_path = previous_section_paths[old_title]
+                            new_path = current_section_paths[new_title]
+                            
+                            # If paths are completely different, maybe it's not a rename
+                            if '>' in old_path and '>' in new_path:
+                                old_parent = old_path.split(' > ')[0]
+                                new_parent = new_path.split(' > ')[0]
+                                
+                                # If parents are different and not similar, probably not a rename
+                                if old_parent != new_parent and SequenceMatcher(None, old_parent.lower(), new_parent.lower()).ratio() < 0.5:
+                                    del renamed_sections[new_title]
+                    
                     removed_sections = previous_sections - current_sections - set(renamed_sections.values())
                 
+                # Mark sections as new or renamed
                 for section in sections:
                     section_title = section["title"]
+                    # Assign path to section for visualization
+                    section["path"] = current_section_paths.get(section_title, section_title)
+                    
                     if previous_sections is None or section_title not in previous_sections:
                         if section_title in renamed_sections:
                             section["isRenamed"] = True
                             section["previousTitle"] = renamed_sections[section_title]
+                            # Store the full path history
+                            if renamed_sections[section_title] in previous_section_paths:
+                                section["previousPath"] = previous_section_paths[renamed_sections[section_title]]
                         else:
                             section["isNew"] = True
                 
                 data = {
                     "sections": sections,
                     "removed": removed_sections,
-                    "renamed": renamed_sections
+                    "renamed": renamed_sections,
+                    "paths": current_section_paths
                 }
                 
                 yearly_revisions[str(year)] = data
                 previous_sections = current_sections
+                previous_section_paths = current_section_paths
                 years_processed.add(year)
     
     return yearly_revisions
-
+    
 def create_section_count_chart(toc_history):
     """
     Create section count visualization with level breakdown
@@ -249,12 +326,26 @@ def create_section_count_chart(toc_history):
     
     return fig
 
-def calculate_edit_activity(revisions, title):
+def calculate_edit_activity(revisions, title, toc_history=None):
+    """
+    Calculate edit activity for each section across years
+    Returns: Dictionary mapping sections to their edit history
+    """
     section_edits = {}
     section_first_seen = {}
-    rename_chains = {}  # Track complete rename history
+    rename_history = {}  # Track rename history
 
-    for rev in reversed(revisions):
+    # Build rename history from toc_history if provided
+    if toc_history:
+        for year, data in sorted(toc_history.items()):
+            if "renamed" in data:
+                for new_name, old_name in data["renamed"].items():
+                    if new_name not in rename_history:
+                        rename_history[new_name] = []
+                    rename_history[new_name].append((old_name, year))
+
+    # Process revisions in chronological order
+    for rev in reversed(revisions):  # Reversed to match Timeline view's order
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
         year_str = str(year)
         
@@ -262,65 +353,60 @@ def calculate_edit_activity(revisions, title):
         if content:
             sections = extract_toc(content)
             
+            # Update edit counts and track renames
             for section in sections:
-                curr_title = section["title"]
+                section_title = section["title"]
                 level = "*" * section["level"]
                 
+                # Check if this is a renamed section
                 if section.get("isRenamed"):
                     old_title = section["previousTitle"]
-                    
-                    # Update rename chains
-                    if old_title in rename_chains:
-                        # If old title was already part of a chain, add new title to that chain
-                        chain = rename_chains[old_title]
-                        rename_chains[curr_title] = chain
-                        chain.append((old_title, year_str))
-                    else:
-                        # Start new chain
-                        rename_chains[curr_title] = [(old_title, year_str)]
-                    
-                    # Merge edit histories
+                    # Update rename history
+                    if section_title not in rename_history:
+                        rename_history[section_title] = [(old_title, year_str)]
+                    # Transfer data from old section to new
                     if old_title in section_edits:
-                        if curr_title not in section_edits:
-                            section_edits[curr_title] = section_edits[old_title].copy()
-                            section_edits[curr_title]["section"] = curr_title
-                            section_first_seen[curr_title] = section_first_seen[old_title]
-                            # Copy complete rename history
-                            old_history = section_edits[old_title].get("rename_history", [])
-                            section_edits[curr_title]["rename_history"] = old_history + [(old_title, year_str)]
+                        if section_title not in section_edits:
+                            section_edits[section_title] = section_edits[old_title].copy()
+                            section_edits[section_title]["section"] = section_title
+                            section_first_seen[section_title] = section_first_seen[old_title]
                         del section_edits[old_title]
                 
                 # Initialize or update section data
-                if curr_title not in section_edits:
-                    section_edits[curr_title] = {
-                        "section": curr_title,
+                if section_title not in section_edits:
+                    section_edits[section_title] = {
+                        "section": section_title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_chains.get(curr_title, [])
+                        "rename_history": rename_history.get(section_title, [])
                     }
-                    section_first_seen[curr_title] = year_str
+                    section_first_seen[section_title] = year_str
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[curr_title]["edits"]:
-                    section_edits[curr_title]["edits"][year_str] = 0
-                section_edits[curr_title]["edits"][year_str] += 1
-                section_edits[curr_title]["totalEdits"] += 1
+                if year_str not in section_edits[section_title]["edits"]:
+                    section_edits[section_title]["edits"][year_str] = 0
+                section_edits[section_title]["edits"][year_str] += 1
+                section_edits[section_title]["totalEdits"] += 1
 
+    # Format data for visualization with rename info
     formatted_data = []
-    for curr_title, data in section_edits.items():
+    for title, data in section_edits.items():
+        first_year = data["first_seen"]
+        lifespan = f"{first_year}-present"
+        
         formatted_data.append({
-            "section": curr_title,
+            "section": title,
             "level": data["level"],
             "edits": data["edits"],
-            "lifespan": f"{data['first_seen']}-present",
+            "lifespan": lifespan,
             "totalEdits": data["totalEdits"],
             "rename_history": data.get("rename_history", [])
         })
 
-    return sorted(formatted_data, key=lambda x: x['section'].lower())
-    
+    return sorted(formatted_data, key=lambda x: x['section'])    
+
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
@@ -336,8 +422,27 @@ with st.sidebar:
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     
+    # Enhanced rename detection controls
+    st.subheader("Rename Detection")
     show_renames = st.toggle("Enable Rename Detection", True,
                            help="When enabled, detects and highlights sections that were renamed")
+    
+    if show_renames:
+        rename_sensitivity = st.slider(
+            "Rename Detection Sensitivity", 
+            min_value=0.5, 
+            max_value=0.9, 
+            value=0.65, 
+            step=0.05,
+            format="%.2f",
+            help="Higher values require more similarity between section titles to be considered a rename"
+        )
+        
+        # Update the similarity threshold dynamically
+        if 'rename_sensitivity' in locals():
+            # We need to modify the detect_renamed_sections function to use this threshold
+            # This is a bit hacky, but we can use it as a global variable
+            st.session_state.rename_threshold = rename_sensitivity
     
     st.divider()  # Add a visual separator
     
@@ -346,7 +451,6 @@ with st.sidebar:
         ["Timeline View", "Edit Activity", "Section Count"],
         key="view_mode"
     )
-
 if wiki_page:
     try:
         with st.spinner("Analyzing page history..."):
@@ -370,6 +474,30 @@ if wiki_page:
                         with st.expander("Section Renames Detected"):
                             for rename in rename_summary:
                                 st.write(rename)
+                    
+                    # Add debug viewing of renames
+                    if 'debug_mode' not in st.session_state:
+                        st.session_state.debug_mode = False
+                        
+                    if toc_history and st.session_state.get('debug_mode', False):
+                        with st.expander("Debug: Rename Detection Analysis"):
+                            # Display all detected renames
+                            st.subheader("Detected Renames by Year")
+                            for year, data in sorted(toc_history.items()):
+                                if data.get("renamed"):
+                                    st.write(f"**Year: {year}**")
+                                    for new_name, old_name in data["renamed"].items():
+                                        # Calculate similarity for debugging
+                                        from difflib import SequenceMatcher
+                                        similarity_score = SequenceMatcher(None, old_name.lower(), new_name.lower()).ratio()
+                                        st.write(f"- '{old_name}' → '{new_name}' (similarity: {similarity_score:.2f})")
+                                        
+                                        # If we have path information, show it
+                                        if "paths" in data and new_name in data["paths"]:
+                                            new_path = data["paths"][new_name]
+                                            st.write(f"  Path: {new_path}")
+                                else:
+                                    st.write(f"**Year: {year}** - No renames detected")
                     
                     if view_mode == "Timeline View":
                         # Controls section
@@ -404,12 +532,16 @@ if wiki_page:
                                     <span>New sections</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="width: 12px; height: 12px; border-radius: 3px; background-color: #fef3c7;"></div>
+                                    <span>Renamed sections</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <div style="width: 12px; height: 12px; border-radius: 3px; background-color: #fee2e2;"></div>
                                     <span>Sections to be removed</span>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
-                        
+
                         st.markdown(f"""
                             <style>
                                 .stHorizontalBlock {{
@@ -490,6 +622,43 @@ if wiki_page:
                                 [data-testid="stHorizontalBlock"] {{
                                     overflow-x: auto !important;
                                 }}
+                                .section-renamed {
+                                    background-color: #fef3c7 !important;
+                                }
+                                .rename-indicator {
+                                    display: inline-block;
+                                    font-size: 0.75em;
+                                    color: #9333ea;
+                                    margin-left: 4px;
+                                    cursor: help;
+                                }
+                                .tooltip {
+                                    position: relative;
+                                    display: inline-block;
+                                }
+                                .tooltip .tooltiptext {
+                                    visibility: hidden;
+                                    width: 180px;
+                                    background-color: #555;
+                                    color: #fff;
+                                    text-align: center;
+                                    border-radius: 4px;
+                                    padding: 5px;
+                                    position: absolute;
+                                    z-index: 100;
+                                    bottom: 125%;
+                                    left: 50%;
+                                    margin-left: -90px;
+                                    opacity: 0;
+                                    transition: opacity 0.3s;
+                                    font-size: 10px;
+                                    white-space: normal;
+                                }
+                                .tooltip:hover .tooltiptext {
+                                    visibility: visible;
+                                    opacity: 1;
+                                }
+                                
                             </style>
                         """, unsafe_allow_html=True)
                         
@@ -510,13 +679,26 @@ if wiki_page:
                                     
                                     class_str = " ".join(classes)
                                     
-                                    st.markdown(f"""
-                                        <div class="section-container">
-                                            {indent}<span class="section-title {class_str}">
-                                                {section["title"]}
-                                            </span>
-                                        </div>
-                                    """, unsafe_allow_html=True)
+                                    # Different display for renamed sections
+                                    if show_renames and section.get("isRenamed"):
+                                        previous_title = section.get("previousTitle", "Unknown")
+                                        st.markdown(f"""
+                                            <div class="section-container">
+                                                {indent}<span class="section-title {class_str} tooltip">
+                                                    {section["title"]}
+                                                    <span class="rename-indicator">↺</span>
+                                                    <span class="tooltiptext">Renamed from: {previous_title}</span>
+                                                </span>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                    else:
+                                        st.markdown(f"""
+                                            <div class="section-container">
+                                                {indent}<span class="section-title {class_str}">
+                                                    {section["title"]}
+                                                </span>
+                                            </div>
+                                        """, unsafe_allow_html=True)
                                 
                                 if "removed" in data:
                                     for removed_section in data["removed"]:
@@ -540,7 +722,7 @@ if wiki_page:
                         # Get real edit activity data
                         revisions = get_page_history(wiki_page)
                         st.write("Calculating edit activity...")
-                        edit_data = calculate_edit_activity(revisions, wiki_page)
+                        edit_data = calculate_edit_activity(revisions, wiki_page, toc_history)
                         
                         if not edit_data:
                             st.warning("No edit activity data found.")

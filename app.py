@@ -657,6 +657,7 @@ if wiki_page:
                                     position: relative;
                                     display: inline-block;
                                 }
+                                tooltip_css = """
                                 .tooltip .tooltiptext {
                                     visibility: hidden;
                                     width: 180px;
@@ -675,6 +676,7 @@ if wiki_page:
                                     font-size: 10px;
                                     white-space: normal;
                                 }
+                                """
                                 .tooltip:hover .tooltiptext {
                                     visibility: visible;
                                     opacity: 1;

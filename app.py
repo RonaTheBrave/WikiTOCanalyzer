@@ -328,21 +328,24 @@ def create_section_count_chart(toc_history):
 
 def calculate_edit_activity(revisions, title, toc_history=None):
     """
-    Calculate edit activity for each section across years
+    Calculate edit activity for each section across years with improved case handling
     Returns: Dictionary mapping sections to their edit history
     """
     section_edits = {}
     section_first_seen = {}
     rename_history = {}  # Track rename history
+    
+    # Dictionary for case-insensitive handling (maps lowercase section titles to actual titles)
+    case_map = {}
 
     # Build rename history from toc_history if provided
     if toc_history:
         for year, data in sorted(toc_history.items()):
             if "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
-                    if new_name not in rename_history:
-                        rename_history[new_name] = []
-                    rename_history[new_name].append((old_name, year))
+                    if new_name.lower() not in rename_history:
+                        rename_history[new_name.lower()] = []
+                    rename_history[new_name.lower()].append((old_name, year))
 
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -358,46 +361,58 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                 section_title = section["title"]
                 level = "*" * section["level"]
                 
+                # Case-insensitive key for lookups
+                section_key = section_title.lower()
+                
+                # Update case map with the current capitalization
+                case_map[section_key] = section_title
+                
                 # Check if this is a renamed section
                 if section.get("isRenamed"):
                     old_title = section["previousTitle"]
+                    old_key = old_title.lower()
+                    
                     # Update rename history
-                    if section_title not in rename_history:
-                        rename_history[section_title] = [(old_title, year_str)]
-                    # Transfer data from old section to new
-                    if old_title in section_edits:
-                        if section_title not in section_edits:
-                            section_edits[section_title] = section_edits[old_title].copy()
-                            section_edits[section_title]["section"] = section_title
-                            section_first_seen[section_title] = section_first_seen[old_title]
-                        del section_edits[old_title]
+                    if section_key not in rename_history:
+                        rename_history[section_key] = [(old_title, year_str)]
+                    
+                    # Transfer data from old section to new (case-insensitive)
+                    if old_key in section_edits:
+                        if section_key not in section_edits:
+                            section_edits[section_key] = section_edits[old_key].copy()
+                            section_edits[section_key]["section"] = section_title  # Use current capitalization
+                            section_first_seen[section_key] = section_first_seen.get(old_key, year_str)
+                        del section_edits[old_key]
                 
                 # Initialize or update section data
-                if section_title not in section_edits:
-                    section_edits[section_title] = {
-                        "section": section_title,
+                if section_key not in section_edits:
+                    section_edits[section_key] = {
+                        "section": section_title,  # Use original capitalization
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(section_title, [])
+                        "rename_history": rename_history.get(section_key, [])
                     }
-                    section_first_seen[section_title] = year_str
+                    section_first_seen[section_key] = year_str
+                else:
+                    # Update the capitalization to the most recent one
+                    section_edits[section_key]["section"] = section_title
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[section_title]["edits"]:
-                    section_edits[section_title]["edits"][year_str] = 0
-                section_edits[section_title]["edits"][year_str] += 1
-                section_edits[section_title]["totalEdits"] += 1
+                if year_str not in section_edits[section_key]["edits"]:
+                    section_edits[section_key]["edits"][year_str] = 0
+                section_edits[section_key]["edits"][year_str] += 1
+                section_edits[section_key]["totalEdits"] += 1
 
-    # Format data for visualization with rename info
+    # Format data for visualization
     formatted_data = []
-    for title, data in section_edits.items():
+    for key, data in section_edits.items():
         first_year = data["first_seen"]
         lifespan = f"{first_year}-present"
         
         formatted_data.append({
-            "section": title,
+            "section": data["section"],  # Use the most recent capitalization
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,
@@ -405,7 +420,8 @@ def calculate_edit_activity(revisions, title, toc_history=None):
             "rename_history": data.get("rename_history", [])
         })
 
-    return sorted(formatted_data, key=lambda x: x['section'])    
+    return sorted(formatted_data, key=lambda x: x['section'].lower())  # Sort by lowercase name for consistency
+
 
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
@@ -547,7 +563,7 @@ if wiki_page:
                                 .stHorizontalBlock {{
                                     overflow-x: auto;
                                     padding: 1rem;
-                                    background: white;
+                                    background-color: white;
                                     border: 1px solid #e5e7eb;
                                     border-radius: 4px;
                                 }}

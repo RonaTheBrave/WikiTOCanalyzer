@@ -563,127 +563,133 @@ if wiki_page:
                             </div>
                         """, unsafe_allow_html=True)
 
-                        st.markdown(f"""
-                            <style>
-                                .stHorizontalBlock {{
-                                    overflow-x: auto;
-                                    padding: 1rem;
-                                    background-color: white;
-                                    border: 1px solid #e5e7eb;
-                                    border-radius: 4px;
-                                }}
-                                [data-testid="column"] {{
-                                    min-width: 300px;
-                                    max-width: 300px;
-                                    border-right: 1px solid #e5e7eb;
-                                    padding: 1rem !important;
-                                    overflow: hidden;
-                                }}
-                                .year-header {{
-                                    font-size: {14 * float(zoom_level)/100}px;
-                                    font-weight: 600;
-                                    margin-bottom: 1rem;
-                                    padding-bottom: 0.5rem;
-                                    border-bottom: 1px solid #e5e7eb;
-                                    text-align: center;
-                                    position: sticky;
-                                    top: 0;
-                                    background-color: white;
-                                    z-index: 10;
-                                }}
-                                .section-container {{
-                                    position: relative;
-                                    padding: 2px 4px 2px 24px;
-                                    margin: 2px 0;
-                                    overflow: hidden;
-                                    width: 100%;
-                                    box-sizing: border-box;
-                                }}
-                                .section-title {{
-                                    display: block;
-                                    white-space: nowrap;
-                                    overflow: hidden;
-                                    text-overflow: ellipsis;
-                                    padding: 2px 4px;
-                                    border-radius: 4px;
-                                    font-size: {13 * float(zoom_level)/100}px;
-                                    transition: all 0.2s;
-                                    position: relative;
-                                    z-index: 2;
-                                    max-width: 100%;
-                                    box-sizing: border-box;
-                                }}
-                                .section-title:hover {{
-                                    background-color: #f3f4f6;
-                                    white-space: normal;
-                                    z-index: 3;
-                                    position: relative;
-                                    overflow: visible;
-                                }}
-                                .section-new {{
-                                    background-color: #dcfce7 !important;
-                                }}
-                                .section-renamed {{
-                                    background-color: #fef3c7 !important;
-                                }}
-                                .vertical-line {{
-                                    position: absolute;
-                                    left: 12px;
-                                    top: 0;
-                                    bottom: 0;
-                                    width: 2px;
-                                    background-color: #e5e7eb;
-                                    z-index: 1;
-                                }}
-                                
-                                /* Additional containment styles */
-                                .streamlit-expanderContent {{
-                                    overflow: hidden;
-                                }}
-                                [data-testid="stHorizontalBlock"] {{
-                                    overflow-x: auto !important;
-                                }}
-                                .section-renamed {
-                                    background-color: #fef3c7 !important;
-                                }
-                                .rename-indicator {
-                                    display: inline-block;
-                                    font-size: 0.75em;
-                                    color: #9333ea;
-                                    margin-left: 4px;
-                                    cursor: help;
-                                }
-                                .tooltip {
-                                    position: relative;
-                                    display: inline-block;
-                                }
-                                tooltip_css = """
-                                .tooltip .tooltiptext {
-                                    visibility: hidden;
-                                    width: 180px;
-                                    background-color: #555;
-                                    color: #fff;
-                                    text-align: center;
-                                    border-radius: 4px;
-                                    padding: 5px;
-                                    position: absolute;
-                                    z-index: 100;
-                                    bottom: 125%;
-                                    left: 50%;
-                                    margin-left: """ + "-90px;" + """
-                                    opacity: 0;
-                                    transition: opacity 0.3s;
-                                    font-size: 10px;
-                                    white-space: normal;
-                                }
-                                """
-                                .tooltip:hover .tooltiptext {
-                                    visibility: visible;
-                                    opacity: 1;
-                                }
-                                
-                            </style>
-                        """, unsafe_allow_html=True)
+                        # Define the dynamic styles separately
+                        year_header_font_size = f"font-size: {14 * float(zoom_level)/100}px;"
+                        section_title_font_size = f"font-size: {13 * float(zoom_level)/100}px;"
+                        
+                        # Now use a normal string for the CSS with placeholders
+                        css = """
+                        <style>
+                            .stHorizontalBlock {
+                                overflow-x: auto;
+                                padding: 1rem;
+                                background-color: white;
+                                border: 1px solid #e5e7eb;
+                                border-radius: 4px;
+                            }
+                            [data-testid="column"] {
+                                min-width: 300px;
+                                max-width: 300px;
+                                border-right: 1px solid #e5e7eb;
+                                padding: 1rem !important;
+                                overflow: hidden;
+                            }
+                            .year-header {
+                                YEAR_HEADER_FONT_SIZE
+                                font-weight: 600;
+                                margin-bottom: 1rem;
+                                padding-bottom: 0.5rem;
+                                border-bottom: 1px solid #e5e7eb;
+                                text-align: center;
+                                position: sticky;
+                                top: 0;
+                                background-color: white;
+                                z-index: 10;
+                            }
+                            .section-container {
+                                position: relative;
+                                padding: 2px 4px 2px 24px;
+                                margin: 2px 0;
+                                overflow: hidden;
+                                width: 100%;
+                                box-sizing: border-box;
+                            }
+                            .section-title {
+                                display: block;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                                padding: 2px 4px;
+                                border-radius: 4px;
+                                SECTION_TITLE_FONT_SIZE
+                                transition: all 0.2s;
+                                position: relative;
+                                z-index: 2;
+                                max-width: 100%;
+                                box-sizing: border-box;
+                            }
+                            .section-title:hover {
+                                background-color: #f3f4f6;
+                                white-space: normal;
+                                z-index: 3;
+                                position: relative;
+                                overflow: visible;
+                            }
+                            .section-new {
+                                background-color: #dcfce7 !important;
+                            }
+                            .section-renamed {
+                                background-color: #fef3c7 !important;
+                            }
+                            .vertical-line {
+                                position: absolute;
+                                left: 12px;
+                                top: 0;
+                                bottom: 0;
+                                width: 2px;
+                                background-color: #e5e7eb;
+                                z-index: 1;
+                            }
+                            
+                            /* Additional containment styles */
+                            .streamlit-expanderContent {
+                                overflow: hidden;
+                            }
+                            [data-testid="stHorizontalBlock"] {
+                                overflow-x: auto !important;
+                            }
+                            .rename-indicator {
+                                display: inline-block;
+                                font-size: 0.75em;
+                                color: #9333ea;
+                                margin-left: 4px;
+                                cursor: help;
+                            }
+                            .tooltip {
+                                position: relative;
+                                display: inline-block;
+                            }
+                            .tooltip .tooltiptext {
+                                visibility: hidden;
+                                width: 180px;
+                                background-color: #555;
+                                color: #fff;
+                                text-align: center;
+                                border-radius: 4px;
+                                padding: 5px;
+                                position: absolute;
+                                z-index: 100;
+                                bottom: 125%;
+                                left: 50%;
+                                margin-left: -90px;
+                                opacity: 0;
+                                transition: opacity 0.3s;
+                                font-size: 10px;
+                                white-space: normal;
+                            }
+                            .tooltip:hover .tooltiptext {
+                                visibility: visible;
+                                opacity: 1;
+                            }
+                        </style>
+                        """
+                        
+                        # Replace the placeholders
+                        css = css.replace('YEAR_HEADER_FONT_SIZE', year_header_font_size)
+                        css = css.replace('SECTION_TITLE_FONT_SIZE', section_title_font_size)
+                        
+                        # Apply the CSS
+                        st.markdown(css, unsafe_allow_html=True)
                         
                         # Display timeline columns
                         cols = st.columns(len(toc_history))

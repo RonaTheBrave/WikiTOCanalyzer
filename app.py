@@ -580,7 +580,7 @@ if wiki_page:
                                     overflow: hidden;
                                 }}
                                 .year-header {{
-                                    font-size: {14 * zoom_level/100}px;
+                                    font-size: {14 * float(zoom_level)/100}px;
                                     font-weight: 600;
                                     margin-bottom: 1rem;
                                     padding-bottom: 0.5rem;
@@ -606,7 +606,7 @@ if wiki_page:
                                     text-overflow: ellipsis;
                                     padding: 2px 4px;
                                     border-radius: 4px;
-                                    font-size: {13 * zoom_level/100}px;
+                                    font-size: {13 * float(zoom_level)/100}px;
                                     transition: all 0.2s;
                                     position: relative;
                                     z-index: 2;

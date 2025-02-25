@@ -516,6 +516,9 @@ if wiki_page:
                                     st.write(f"**Year: {year}** - No renames detected")
                     
                     if view_mode == "Timeline View":
+                        
+                        background = "white"  # Define background in case it's referenced
+                        
                         # Controls section
                         col1, col2 = st.columns([3, 1])
                         with col1:

@@ -583,7 +583,7 @@ if wiki_page:
                                     text-align: center;
                                     position: sticky;
                                     top: 0;
-                                    background: white;
+                                    background-color: white;
                                     z-index: 10;
                                 }}
                                 .section-container {{

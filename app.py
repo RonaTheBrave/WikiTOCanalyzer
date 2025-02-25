@@ -522,7 +522,9 @@ if wiki_page:
                         # Controls section
                         col1, col2 = st.columns([3, 1])
                         with col1:
-                            zoom_level = st.slider("Zoom", 50, 200, 100, 10)
+                            zoom_level_raw = st.slider("Zoom", 50, 200, 100, 10)
+                            zoom_level = float(zoom_level_raw)  # Ensure it's a number
+                    
                         with col2:
                             # Prepare CSV data
                             csv_data = []

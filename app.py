@@ -516,7 +516,7 @@ if wiki_page:
                                     st.write(f"**Year: {year}** - No renames detected")
                     
                     if view_mode == "Timeline View":
-                        
+                        color = "#000000"  # Define color in case it's referenced
                         background = "white"  # Define background in case it's referenced
                         
                         # Controls section

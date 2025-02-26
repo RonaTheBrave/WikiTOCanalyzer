@@ -896,16 +896,15 @@ if wiki_page:
                                         font-weight: bold;
                                     }
                                     .rename-history {
-                                        display: none;
+                                        display: block;
                                         margin-top: 8px;
                                         padding: 6px 8px;
                                         border-left: 3px solid #d8b4fe;
                                         background-color: #f9f5ff;
                                         border-radius: 0 4px 4px 0;
                                         font-size: 0.85em;
-                                    }
-                                    .section-row.has-renames:hover .rename-history {
-                                        display: block;
+                                        max-width: 250px;
+                                        overflow-wrap: break-word;
                                     }
                                     .rename-history-header {
                                         font-weight: 500;
@@ -959,7 +958,7 @@ if wiki_page:
                             
                             table_html += """
                                             <th style="text-align: left;">Lifespan</th>
-                                            <th>Total Edits</th>
+                                            <th style="text-align: center;">Total Edits</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1040,7 +1039,9 @@ if wiki_page:
                                         bg_color = get_color(edit_count)
                                     
                                     table_html += f'<td><div class="edit-cell" style="background-color: {bg_color}">{display_value}</div></td>'
-                                table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'
+                                
+                                table_html += f'<td style="text-align: left;">{row["lifespan"]}</td>'
+                                table_html += f'<td style="text-align: center; font-weight: 500;">{row["totalEdits"]}</td></tr>'
                                 
                             
                             table_html += """

@@ -863,6 +863,7 @@ if wiki_page:
                             # Add rename chain styles
                             st.markdown("""
                                 <style>
+                                    /* Basic rename styles */
                                     .rename-chain {
                                         color: #9333ea;
                                         font-size: 0.8em;
@@ -877,6 +878,68 @@ if wiki_page:
                                     .rename-arrow {
                                         color: #9333ea;
                                         margin-right: 4px;
+                                    }
+                                    
+                                    /* Enhanced rename history styles */
+                                    .section-row.has-renames {
+                                        background-color: #fcfaff !important;
+                                    }
+                                    .section-row.has-renames:hover {
+                                        background-color: #f7f2fb !important;
+                                    }
+                                    .rename-indicator {
+                                        display: inline-block;
+                                        font-size: 0.9em;
+                                        color: #9333ea;
+                                        margin-left: 4px;
+                                        cursor: help;
+                                        font-weight: bold;
+                                    }
+                                    .rename-history {
+                                        display: none;
+                                        margin-top: 8px;
+                                        padding: 6px 8px;
+                                        border-left: 3px solid #d8b4fe;
+                                        background-color: #f9f5ff;
+                                        border-radius: 0 4px 4px 0;
+                                        font-size: 0.85em;
+                                    }
+                                    .section-row.has-renames:hover .rename-history {
+                                        display: block;
+                                    }
+                                    .rename-history-header {
+                                        font-weight: 500;
+                                        color: #7e22ce;
+                                        margin-bottom: 4px;
+                                    }
+                                    .rename-entry {
+                                        padding: 2px 0;
+                                        color: #6b21a8;
+                                    }
+                                    .old-name {
+                                        font-style: italic;
+                                        font-weight: 500;
+                                    }
+                                    
+                                    /* Similarity score styles */
+                                    .similarity-score {
+                                        display: inline-block;
+                                        padding: 1px 4px;
+                                        border-radius: 3px;
+                                        font-size: 0.8em;
+                                        margin-left: 4px;
+                                    }
+                                    .high-similarity {
+                                        background-color: #dcfce7;
+                                        color: #166534;
+                                    }
+                                    .medium-similarity {
+                                        background-color: #fef3c7;
+                                        color: #92400e;
+                                    }
+                                    .low-similarity {
+                                        background-color: #fee2e2;
+                                        color: #991b1b;
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
@@ -908,10 +971,45 @@ if wiki_page:
                                 # Add rename history indicator if exists
                                 rename_info = ""
                                 if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
-                                    changes = [f"{old} ({year})" for old, year in row['rename_history']]
-                                    rename_info = f' <span style="color: #9333ea; font-size: 0.8em; padding: 2px 4px; background-color: #f3e8ff; border-radius: 3px; margin-left: 4px;">↺ {", ".join(changes)}</span>'
+                                    # Create a more detailed and visible rename history display
+                                    rename_info = '<div class="rename-history">'
+                                    rename_info += '<div class="rename-history-header">Section name history:</div>'
+                                    
+                                    # Sort rename history by year (newest first)
+                                    sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
+                                    
+                                    for i, (old_name, year) in enumerate(sorted_history):
+                                        # Calculate similarity score for research purposes
+                                        from difflib import SequenceMatcher
+                                        similarity = SequenceMatcher(None, old_name.lower(), row["section"].lower()).ratio()
+                                        similarity_pct = round(similarity * 100)
+                                        
+                                        # Add similarity score indicator
+                                        similarity_class = "high-similarity" if similarity > 0.8 else "medium-similarity" if similarity > 0.6 else "low-similarity"
+                                        
+                                        if i < len(sorted_history) - 1:
+                                            # Not the oldest rename
+                                            rename_info += f'<div class="rename-entry">{year}: Changed from "<span class="old-name">{old_name}</span>" '
+                                            rename_info += f'<span class="similarity-score {similarity_class}" title="Text similarity between old and new names">{similarity_pct}% match</span></div>'
+                                        else:
+                                            # The oldest rename (original name)
+                                            rename_info += f'<div class="rename-entry">{year}: Originally created as "<span class="old-name">{old_name}</span>" '
+                                            rename_info += f'<span class="similarity-score {similarity_class}" title="Text similarity between old and new names">{similarity_pct}% match</span></div>'
+                                    
+                                    rename_info += '</div>'
                                 
-                                table_html += f'<tr><td style="text-align: left;">{row["section"]}{rename_info}</td>'
+                                table_html += f'<tr class="section-row {row.get("rename_history") and "has-renames" or ""}">'
+                                table_html += f'<td style="text-align: left;" class="section-name-cell">'
+                                table_html += f'<div class="section-name">{row["section"]}'
+                                
+                                # Add a small icon to indicate renames
+                                if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
+                                    table_html += f' <span class="rename-indicator" title="This section was renamed">↺</span>'
+                                
+                                table_html += '</div>'
+                                table_html += rename_info
+                                table_html += '</td>'
+                                
                                 table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'
                                 
                                 for year in years:

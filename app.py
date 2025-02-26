@@ -149,15 +149,26 @@ def detect_renamed_sections(prev_sections, curr_sections):
     # Sections that are exact matches
     exact_matches = prev_titles.intersection(curr_titles)
     
-    # Create mapping of lowercase to original case for remaining sections
-    prev_case_map = {s.lower(): s for s in prev_titles - exact_matches}
-    curr_case_map = {s.lower(): s for s in curr_titles - exact_matches}
-    
-    # Find sections that differ only in case
+    # Enhanced case detection - more explicit approach
     case_renames = {}
+    # First explicitly check for case-insensitive matches (clearer debugging)
+    for old_title in prev_titles - exact_matches:
+        for new_title in curr_titles - exact_matches:
+            if old_title.lower() == new_title.lower() and old_title != new_title:
+                case_renames[new_title] = old_title
+                print(f"DEBUG: Case-different rename detected: '{old_title}' → '{new_title}'")
+    
+    # Fall back to previous approach as well
+    prev_case_map = {s.lower(): s for s in prev_titles - exact_matches - set(case_renames.values())}
+    curr_case_map = {s.lower(): s for s in curr_titles - exact_matches - set(case_renames.keys())}
+    
+    # Find any additional sections that differ only in case
     for s_lower in set(prev_case_map.keys()) & set(curr_case_map.keys()):
         if prev_case_map[s_lower] != curr_case_map[s_lower]:
-            case_renames[curr_case_map[s_lower]] = prev_case_map[s_lower]
+            new_title = curr_case_map[s_lower]
+            old_title = prev_case_map[s_lower]
+            case_renames[new_title] = old_title
+            print(f"DEBUG: Additional case rename: '{old_title}' → '{new_title}'")
     
     # Find other renamed sections using similarity
     removed_titles = prev_titles - exact_matches - set(case_renames.values())
@@ -237,9 +248,11 @@ def process_revision_history(title):
                 renamed_sections = {}
                 removed_sections = set()
                 
-                if previous_sections is not None:
-                    # Basic rename detection based on titles
+                if previous_sections is not None and st.session_state.get('show_renames', True):
+                    # Basic rename detection based on titles - only if enabled
+                    print(f"DEBUG: Running rename detection for year {year}")
                     renamed_sections = detect_renamed_sections(previous_sections, current_sections)
+                    print(f"DEBUG: Found {len(renamed_sections)} renames for year {year}")
                     
                     # Further refine based on paths
                     for new_title, old_title in list(renamed_sections.items()):
@@ -486,6 +499,13 @@ with st.sidebar:
     st.subheader("Rename Detection")
     show_renames = st.toggle("Enable Rename Detection", True,
                            help="When enabled, detects and highlights sections that were renamed")
+    
+    # Store in session state to ensure it's available throughout the app
+    st.session_state['show_renames'] = show_renames
+    print(f"DEBUG: Set show_renames in session state to {show_renames}")
+    
+    # Debug toggle value
+    print(f"DEBUG: Show renames toggle is set to: {show_renames}")
     
     if show_renames:
         rename_sensitivity = st.slider(
@@ -806,6 +826,9 @@ if wiki_page:
                             intensity = value / max_edits
                             rgb_value = round(255 * (1 - intensity))
                             return f'rgb(255, {rgb_value}, {rgb_value})'
+
+                        # Show current rename detection status
+                        st.info(f"Rename detection is currently {'ENABLED' if st.session_state.get('show_renames', True) else 'DISABLED'}")
                         
                         # Get real edit activity data
                         revisions = get_page_history(wiki_page)

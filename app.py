@@ -274,6 +274,14 @@ def process_revision_history(title):
                         else:
                             section["isNew"] = True
                 
+                # Debug renamed sections count
+                renamed_count = sum(1 for s in sections if s.get("isRenamed", False))
+                if renamed_count > 0:
+                    print(f"DEBUG: Marked {renamed_count} sections as renamed in year {year}")
+                    # Print the first 3 renamed sections
+                    for i, s in enumerate([s for s in sections if s.get("isRenamed", False)][:3]):
+                        print(f"  - '{s['previousTitle']}' → '{s['title']}'")
+                        
                 data = {
                     "sections": sections,
                     "removed": removed_sections,
@@ -338,17 +346,39 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     # Dictionary for case-insensitive handling (maps lowercase section titles to actual titles)
     case_map = {}
 
-    # Build rename history from toc_history if provided - with debug output
+    # Build rename history from toc_history if provided - with detailed debug
     if toc_history:
         print("Building rename history from TOC data")
+        rename_found = False
+        
+        # Debug the toc_history structure
+        print(f"TOC history contains {len(toc_history)} years")
         for year, data in sorted(toc_history.items()):
-            if "renamed" in data:
-                print(f"Year {year}: Found {len(data['renamed'])} renames")
+            has_renamed = "renamed" in data and len(data["renamed"]) > 0
+            print(f"Year {year}: Has 'renamed' key: {'renamed' in data}, Has renames: {has_renamed}")
+            if has_renamed:
+                print(f"  Found {len(data['renamed'])} renames in year {year}")
+                rename_found = True
+        
+        if not rename_found:
+            print("WARNING: No renames found in TOC history")
+            
+        # Now try to build the rename history
+        for year, data in sorted(toc_history.items()):
+            if "renamed" in data and data["renamed"]:
                 for new_name, old_name in data["renamed"].items():
-                    if new_name.lower() not in rename_history:
-                        rename_history[new_name.lower()] = []
-                    rename_history[new_name.lower()].append((old_name, year))
-                    print(f"  Added rename: '{old_name}' → '{new_name}'")
+                    print(f"Processing rename: '{old_name}' → '{new_name}' from year {year}")
+                    
+                    # Check if the keys are properly accessible
+                    new_key = new_name.lower()
+                    print(f"  Using lowercase new key: '{new_key}'")
+                    
+                    if new_key not in rename_history:
+                        rename_history[new_key] = []
+                        print(f"  Created new rename history entry for '{new_key}'")
+                    
+                    rename_history[new_key].append((old_name, year))
+                    print(f"  Added rename: '{old_name}' → '{new_name}' for year {year}")
 
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -505,6 +535,21 @@ if wiki_page:
                             for rename in rename_summary:
                                 st.write(rename)
                     
+                    # Debug TOC data structure
+                    with st.expander("DEBUG: TOC Rename Data"):
+                        st.write("Checking TOC history structure")
+                        rename_found = False
+                        for year, data in sorted(toc_history.items()):
+                            if "renamed" in data and data["renamed"]:
+                                rename_found = True
+                                st.write(f"Year {year} has {len(data['renamed'])} renames in TOC history")
+                                # Display first 3 renames
+                                for i, (new_name, old_name) in enumerate(list(data["renamed"].items())[:3]):
+                                    st.write(f"  - '{old_name}' → '{new_name}'")
+                        
+                        if not rename_found:
+                            st.write("No renames found in any year in TOC history")
+                            
                     # Add debug viewing of renames
                     if 'debug_mode' not in st.session_state:
                         st.session_state.debug_mode = False
@@ -782,6 +827,21 @@ if wiki_page:
                             st.write(f"Total renames detected: {rename_count}")
                             
                         edit_data = calculate_edit_activity(revisions, wiki_page, toc_history)
+                        
+                        # Debug: Check for rename history in edit_data
+                        with st.expander("DEBUG: Edit Data Rename Info"):
+                            st.write("Examining edit_data for rename history")
+                            sections_with_rename = [row for row in edit_data if row.get('rename_history') and len(row.get('rename_history', [])) > 0]
+                            st.write(f"Found {len(sections_with_rename)} sections with rename history in edit_data")
+                            
+                            if sections_with_rename:
+                                st.write("First few sections with rename history:")
+                                for i, row in enumerate(sections_with_rename[:3]):
+                                    st.write(f"  - Section '{row['section']}' has {len(row['rename_history'])} renames:")
+                                    for old_name, year in row['rename_history']:
+                                        st.write(f"    * In {year}: '{old_name}' → '{row['section']}'")
+                            else:
+                                st.write("No sections with rename history found in edit_data")
                         
                         if not edit_data:
                             st.warning("No edit activity data found.")

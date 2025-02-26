@@ -338,14 +338,17 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     # Dictionary for case-insensitive handling (maps lowercase section titles to actual titles)
     case_map = {}
 
-    # Build rename history from toc_history if provided
+    # Build rename history from toc_history if provided - with debug output
     if toc_history:
+        print("Building rename history from TOC data")
         for year, data in sorted(toc_history.items()):
             if "renamed" in data:
+                print(f"Year {year}: Found {len(data['renamed'])} renames")
                 for new_name, old_name in data["renamed"].items():
                     if new_name.lower() not in rename_history:
                         rename_history[new_name.lower()] = []
                     rename_history[new_name.lower()].append((old_name, year))
+                    print(f"  Added rename: '{old_name}' → '{new_name}'")
 
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -386,18 +389,29 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                 
                 # Initialize or update section data
                 if section_key not in section_edits:
+                    has_rename = section_key in rename_history and len(rename_history[section_key]) > 0
                     section_edits[section_key] = {
                         "section": section_title,  # Use original capitalization
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(section_key, [])
+                        "rename_history": rename_history.get(section_key, []),
+                        "has_rename": has_rename
                     }
                     section_first_seen[section_key] = year_str
+                    
+                    # Debug output for sections with rename history
+                    if has_rename:
+                        print(f"Section '{section_title}' has rename history: {rename_history[section_key]}")
                 else:
                     # Update the capitalization to the most recent one
                     section_edits[section_key]["section"] = section_title
+                    
+                    # Make sure rename history is set even for existing sections
+                    if section_key in rename_history and len(rename_history[section_key]) > 0:
+                        section_edits[section_key]["rename_history"] = rename_history[section_key]
+                        section_edits[section_key]["has_rename"] = True
                 
                 # Increment edit count for this year
                 if year_str not in section_edits[section_key]["edits"]:
@@ -751,6 +765,22 @@ if wiki_page:
                         # Get real edit activity data
                         revisions = get_page_history(wiki_page)
                         st.write("Calculating edit activity...")
+
+                        # Debugging section
+                        with st.expander("Debug Rename Information"):
+                            st.write("Checking for rename data in TOC history...")
+                            rename_count = 0
+                            for year, data in sorted(toc_history.items()):
+                                if data.get("renamed"):
+                                    st.write(f"Year {year}: {len(data['renamed'])} renames found")
+                                    rename_count += len(data['renamed'])
+                                    
+                                    # Show some details
+                                    for new_name, old_name in list(data['renamed'].items())[:5]:  # Show only first 5
+                                        st.write(f"  '{old_name}' → '{new_name}'")
+                            
+                            st.write(f"Total renames detected: {rename_count}")
+                            
                         edit_data = calculate_edit_activity(revisions, wiki_page, toc_history)
                         
                         if not edit_data:
@@ -896,16 +926,19 @@ if wiki_page:
                                         font-weight: bold;
                                     }
                                     .rename-history {
-                                        display: block;
+                                        display: block !important; /* Force display */
                                         margin-top: 8px;
                                         padding: 6px 8px;
                                         border-left: 3px solid #d8b4fe;
                                         background-color: #f9f5ff;
                                         border-radius: 0 4px 4px 0;
                                         font-size: 0.85em;
-                                        max-width: 250px;
-                                        overflow-wrap: break-word;
                                     }
+                                    /* No longer needed since display is always on
+                                    .section-row.has-renames:hover .rename-history {
+                                        display: block;
+                                    } */
+                                    
                                     .rename-history-header {
                                         font-weight: 500;
                                         color: #7e22ce;
@@ -997,13 +1030,13 @@ if wiki_page:
                                     
                                     rename_info += '</div>'
                                 
-                                table_html += f'<tr class="section-row {row.get("rename_history") and "has-renames" or ""}">'
+                                table_html += f'<tr class="section-row {len(row.get("rename_history", [])) > 0 and "has-renames" or ""}">'
                                 table_html += f'<td style="text-align: left;" class="section-name-cell">'
                                 table_html += f'<div class="section-name">{row["section"]}'
                                 
-                                # Add a small icon to indicate renames
+                                # Add a small icon to indicate renames with clearer visibility
                                 if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
-                                    table_html += f' <span class="rename-indicator" title="This section was renamed">↺</span>'
+                                    table_html += f' <span class="rename-indicator" style="color: #9333ea; font-weight: bold;" title="This section was renamed">↺ Renamed</span>'
                                 
                                 table_html += '</div>'
                                 table_html += rename_info

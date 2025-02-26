@@ -1040,8 +1040,7 @@ if wiki_page:
                                         bg_color = get_color(edit_count)
                                     
                                     table_html += f'<td><div class="edit-cell" style="background-color: {bg_color}">{display_value}</div></td>'
-                                    table_html += f'<td style="text-align: center; font-weight: 500;">{row["totalEdits"]}</td></tr>'
-
+                                table_html += f'<td style="font-weight: 500;">{row["totalEdits"]}</td></tr>'
                                 
                             
                             table_html += """

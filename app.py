@@ -925,19 +925,10 @@ if wiki_page:
                                         cursor: help;
                                         font-weight: bold;
                                     }
-                                    .rename-history {
-                                        display: block !important; /* Force display */
-                                        margin-top: 8px;
-                                        padding: 6px 8px;
-                                        border-left: 3px solid #d8b4fe;
-                                        background-color: #f9f5ff;
-                                        border-radius: 0 4px 4px 0;
-                                        font-size: 0.85em;
+                                    /* Simplified rename styling */
+                                    .renamed-section {
+                                        background-color: #fcf6ff;
                                     }
-                                    /* No longer needed since display is always on
-                                    .section-row.has-renames:hover .rename-history {
-                                        display: block;
-                                    } */
                                     
                                     .rename-history-header {
                                         font-weight: 500;
@@ -1000,46 +991,32 @@ if wiki_page:
                             
                             # Add data rows
                             for row in edit_data:
-                                # Add rename history indicator if exists
+                                
+                                # Simple rename indicator without complex history
                                 rename_info = ""
-                                if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
-                                    # Create a more detailed and visible rename history display
-                                    rename_info = '<div class="rename-history">'
-                                    rename_info += '<div class="rename-history-header">Section name history:</div>'
-                                    
-                                    # Sort rename history by year (newest first)
-                                    sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
-                                    
-                                    for i, (old_name, year) in enumerate(sorted_history):
-                                        # Calculate similarity score for research purposes
-                                        from difflib import SequenceMatcher
-                                        similarity = SequenceMatcher(None, old_name.lower(), row["section"].lower()).ratio()
-                                        similarity_pct = round(similarity * 100)
-                                        
-                                        # Add similarity score indicator
-                                        similarity_class = "high-similarity" if similarity > 0.8 else "medium-similarity" if similarity > 0.6 else "low-similarity"
-                                        
-                                        if i < len(sorted_history) - 1:
-                                            # Not the oldest rename
-                                            rename_info += f'<div class="rename-entry">{year}: Changed from "<span class="old-name">{old_name}</span>" '
-                                            rename_info += f'<span class="similarity-score {similarity_class}" title="Text similarity between old and new names">{similarity_pct}% match</span></div>'
-                                        else:
-                                            # The oldest rename (original name)
-                                            rename_info += f'<div class="rename-entry">{year}: Originally created as "<span class="old-name">{old_name}</span>" '
-                                            rename_info += f'<span class="similarity-score {similarity_class}" title="Text similarity between old and new names">{similarity_pct}% match</span></div>'
-                                    
-                                    rename_info += '</div>'
+                                has_rename = row.get('rename_history') and len(row.get('rename_history', [])) > 0
                                 
-                                table_html += f'<tr class="section-row {len(row.get("rename_history", [])) > 0 and "has-renames" or ""}">'
-                                table_html += f'<td style="text-align: left;" class="section-name-cell">'
-                                table_html += f'<div class="section-name">{row["section"]}'
+                                # Simplified row with clear cell background for renamed sections
+                                table_html += f'<tr class="section-row">'
                                 
-                                # Add a small icon to indicate renames with clearer visibility
-                                if row.get('rename_history') and len(row.get('rename_history', [])) > 0:
-                                    table_html += f' <span class="rename-indicator" style="color: #9333ea; font-weight: bold;" title="This section was renamed">↺ Renamed</span>'
+                                # Simple background color for renamed sections
+                                cell_bg = "#fcf6ff" if has_rename else ""
+                                cell_style = f'background-color: {cell_bg};' if has_rename else ""
                                 
-                                table_html += '</div>'
-                                table_html += rename_info
+                                table_html += f'<td style="text-align: left; {cell_style}">'
+                                
+                                # Make renamed sections stand out with a badge
+                                if has_rename:
+                                    old_name = row['rename_history'][0][0]  # Get first old name
+                                    year = row['rename_history'][0][1]      # Get year of first rename
+                                    table_html += f'<div style="padding: 4px;">'
+                                    table_html += f'<strong>{row["section"]}</strong> '
+                                    table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
+                                    table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
+                                    table_html += f'</div>'
+                                else:
+                                    table_html += f'{row["section"]}'
+                                
                                 table_html += '</td>'
                                 
                                 table_html += f'<td style="text-align: left; font-family: monospace;">{row["level"]}</td>'

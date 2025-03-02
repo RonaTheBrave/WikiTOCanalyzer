@@ -202,12 +202,24 @@ def calculate_toc_change_significance(current_sections, previous_sections):
     Calculate the significance of changes between two TOC versions.
     Returns a significance score and change summary.
     """
+    # Handle None or empty inputs
     if previous_sections is None:
-        # First version is always significant
         return 10, "Initial version"
     
-    current_set = {s["title"] for s in current_sections}
-    previous_set = {s["title"] for s in previous_sections}
+    if not current_sections or not isinstance(current_sections, list):
+        return 5, "Invalid current sections data"
+        
+    if not previous_sections or not isinstance(previous_sections, list):
+        return 5, "Invalid previous sections data"
+    
+    try:
+        # Safely extract titles using .get() to avoid KeyError
+        current_set = {s.get("title", "") for s in current_sections if isinstance(s, dict) and "title" in s}
+        previous_set = {s.get("title", "") for s in previous_sections if isinstance(s, dict) and "title" in s}
+        
+        # Skip empty sets
+        if not current_set or not previous_set:
+            return 5, "Empty section data"
     
     # Calculate changes
     added = current_set - previous_set
@@ -244,7 +256,6 @@ def calculate_toc_change_significance(current_sections, previous_sections):
     
     return significance, change_summary
 
-# AFTER
 def process_revision_history(title, mode="yearly", significance_threshold=5):
     """
     Process revision history and extract TOC
@@ -300,8 +311,8 @@ def process_revision_history(title, mode="yearly", significance_threshold=5):
                 years_processed.add(year)
                 revision_key = str(year)
         else:  # significant mode
-            # Include if this is a significant change
-            if significance >= significance_threshold:
+            # Include if this is a significant change or first revision
+            if previous_sections is None or significance >= significance_threshold:
                 include_revision = True
                 # Use timestamp as key for significant revisions
                 formatted_date = date.strftime("%Y-%m-%d")
@@ -534,7 +545,6 @@ st.title("Wikipedia Table of Contents History Viewer")
 st.write("This tool shows how the table of contents structure has evolved over time")
 
 # Input section
-# AFTER
 with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
@@ -854,22 +864,39 @@ if wiki_page:
                         # Apply the CSS
                         st.markdown(css, unsafe_allow_html=True)
                         
-                        # Display timeline columns
-                        # Skip metadata entry if present
-                        display_items = {k: v for k, v in toc_history.items() if k != "_metadata"}
+
+                        def format_display_date(key):
+                            """Format display date for timeline view"""
+                            try:
+                                if "-" in key and len(key) == 10:  # Looks like a date YYYY-MM-DD
+                                    date_obj = datetime.strptime(key, "%Y-%m-%d")
+                                    return date_obj.strftime("%b %d, %Y")
+                                return key  # Return as is if not a date
+                            except:
+                                return key  # Return as is on any error
+                                
+                        # Display timeline columns - ensure we have valid entries with sections
+                        display_items = {k: v for k, v in toc_history.items() 
+                                        if k != "_metadata" and isinstance(v, dict) and "sections" in v}
                         
-                        cols = st.columns(len(display_items))
-                        for idx, (key, data) in enumerate(sorted(display_items.items())):
-                            with cols[idx]:
+                        if not display_items:
+                            st.warning("No TOC versions found with the current settings. Try adjusting the significance threshold.")
+                        else:
+                            cols = st.columns(len(display_items))
+                            for idx, (key, data) in enumerate(sorted(display_items.items())):
+                                with cols[idx]:
+                                
                                 # Show revision date and change summary for significant mode
                                 if st.session_state.toc_version_mode == "Significant Changes":
-                                    display_date = key  # Already formatted as YYYY-MM-DD
-                                    significance_indicator = "★" * min(5, round(data.get("significance", 0)/2))
+                                    display_date = format_display_date(key)  # Format date if it's a date
+                                    significance_value = data.get("significance", 0)
+                                    # Ensure at least 1 star for visual feedback
+                                    significance_indicator = "★" * max(1, min(5, round(significance_value/2)))
                                     
                                     header_html = f'''
                                     <div class="year-header">
                                         {display_date}
-                                        <div class="significance-indicator" title="Significance: {data.get('significance', 0)}/10">
+                                        <div class="significance-indicator" title="Significance: {significance_value}/10">
                                             <span style="color: #9333ea; font-size: 0.8em;">{significance_indicator}</span>
                                         </div>
                                         <div class="change-summary" style="font-size: 0.8em; font-weight: normal; margin-top: 4px;">

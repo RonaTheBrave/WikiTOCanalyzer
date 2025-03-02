@@ -561,71 +561,71 @@ with st.sidebar:
     # Only show TOC Version Selection for Timeline View
     if view_mode == "Timeline View":
         # First define the view mode
-view_mode = st.radio(
-    "Analysis Mode",
-    ["Timeline View", "Edit Activity", "Section Count"],
-    key="view_mode"
-)
-
-# Only show TOC Version Selection for Timeline View
-if view_mode == "Timeline View":
-    st.subheader("TOC Version Selection")
-    toc_version_mode = st.radio(
-        "Show TOC versions:",
-        ["Yearly Snapshots", "Significant Changes"],
-        key="toc_version_mode",
-        help="Choose how TOC versions are selected. Yearly shows one version per year, Significant shows versions where important changes occurred."
-    )
-    
-    # Add significance threshold if "Significant Changes" is selected
-    if toc_version_mode == "Significant Changes":
-        significance_threshold = st.slider(
-            "Significance Threshold", 
-            min_value=1, 
-            max_value=10, 
-            value=5,
-            help="Controls which TOC changes appear. Higher values (8-10): major reorganizations only. " +
-                "Medium values (4-7): notable section changes. Lower values (1-3): includes minor changes " +
-                "like capitalization. Based on added, removed, renamed sections and hierarchy changes."
+        view_mode = st.radio(
+            "Analysis Mode",
+            ["Timeline View", "Edit Activity", "Section Count"],
+            key="view_mode"
         )
-else:
-    # Set default value for other tabs
-    if "toc_version_mode" not in st.session_state:
-        st.session_state.toc_version_mode = "Yearly Snapshots"
-    
-    # Create a hidden variable to prevent errors
-    if "significance_threshold" not in st.session_state:
-        st.session_state.significance_threshold = 5
-
-st.subheader("Display Options")
-show_renames = st.toggle("Enable Rename Detection", True,
-                       help="When enabled, detects and highlights sections that were renamed")
-
-# Store in session state to ensure it's available throughout the app
-st.session_state['show_renames'] = show_renames
-print(f"DEBUG: Set show_renames in session state to {show_renames}")
-
-# Debug toggle value
-print(f"DEBUG: Show renames toggle is set to: {show_renames}")
-
-if show_renames:
-    rename_sensitivity = st.slider(
-        "Rename Detection Sensitivity", 
-        min_value=0.5, 
-        max_value=0.9, 
-        value=0.65, 
-        step=0.05,
-        format="%.2f",
-        help="Higher values require more similarity between section titles to be considered a rename"
-    )
-    
-    # Update the similarity threshold dynamically
-    if 'rename_sensitivity' in locals():
-        # We need to modify the detect_renamed_sections function to use this threshold
-        # This is a bit hacky, but we can use it as a global variable
-        st.session_state.rename_threshold = rename_sensitivity
-
-st.divider()  # Add a visual separator
+        
+        # Only show TOC Version Selection for Timeline View
+        if view_mode == "Timeline View":
+            st.subheader("TOC Version Selection")
+            toc_version_mode = st.radio(
+                "Show TOC versions:",
+                ["Yearly Snapshots", "Significant Changes"],
+                key="toc_version_mode",
+                help="Choose how TOC versions are selected. Yearly shows one version per year, Significant shows versions where important changes occurred."
+            )
+            
+            # Add significance threshold if "Significant Changes" is selected
+            if toc_version_mode == "Significant Changes":
+                significance_threshold = st.slider(
+                    "Significance Threshold", 
+                    min_value=1, 
+                    max_value=10, 
+                    value=5,
+                    help="Controls which TOC changes appear. Higher values (8-10): major reorganizations only. " +
+                        "Medium values (4-7): notable section changes. Lower values (1-3): includes minor changes " +
+                        "like capitalization. Based on added, removed, renamed sections and hierarchy changes."
+                )
+        else:
+            # Set default value for other tabs
+            if "toc_version_mode" not in st.session_state:
+                st.session_state.toc_version_mode = "Yearly Snapshots"
+            
+            # Create a hidden variable to prevent errors
+            if "significance_threshold" not in st.session_state:
+                st.session_state.significance_threshold = 5
+        
+        st.subheader("Display Options")
+        show_renames = st.toggle("Enable Rename Detection", True,
+                               help="When enabled, detects and highlights sections that were renamed")
+        
+        # Store in session state to ensure it's available throughout the app
+        st.session_state['show_renames'] = show_renames
+        print(f"DEBUG: Set show_renames in session state to {show_renames}")
+        
+        # Debug toggle value
+        print(f"DEBUG: Show renames toggle is set to: {show_renames}")
+        
+        if show_renames:
+            rename_sensitivity = st.slider(
+                "Rename Detection Sensitivity", 
+                min_value=0.5, 
+                max_value=0.9, 
+                value=0.65, 
+                step=0.05,
+                format="%.2f",
+                help="Higher values require more similarity between section titles to be considered a rename"
+            )
+            
+            # Update the similarity threshold dynamically
+            if 'rename_sensitivity' in locals():
+                # We need to modify the detect_renamed_sections function to use this threshold
+                # This is a bit hacky, but we can use it as a global variable
+                st.session_state.rename_threshold = rename_sensitivity
+        
+        st.divider()  # Add a visual separator
 if wiki_page:
     try:
         with st.spinner("Analyzing page history..."):

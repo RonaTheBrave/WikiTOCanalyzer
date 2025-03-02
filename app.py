@@ -897,66 +897,66 @@ if wiki_page:
                                         # Ensure at least 1 star for visual feedback
                                         significance_indicator = "★" * max(1, min(5, round(significance_value/2)))
                                     
-                                    header_html = f'''
-                                    <div class="year-header">
-                                        {display_date}
-                                        <div class="significance-indicator" title="Significance: {significance_value}/10">
-                                            <span style="color: #9333ea; font-size: 0.8em;">{significance_indicator}</span>
-                                        </div>
-                                        <div class="change-summary" style="font-size: 0.8em; font-weight: normal; margin-top: 4px;">
-                                            {data.get('change_summary', '')}
-                                        </div>
-                                    </div>
-                                    '''
-                                    st.markdown(header_html, unsafe_allow_html=True)
-                                else:
-                                    # Original yearly view
-                                    st.markdown(f'<div class="year-header">{key}</div>', 
-                                              unsafe_allow_html=True)        
-                                for section in data["sections"]:
-                                    indent = "&nbsp;" * (4 * (section["level"] - 1))
-                                    classes = []
-                                    if section.get("isNew"):
-                                        classes.append("section-new")
-                                    if show_renames and section.get("isRenamed"):
-                                        classes.append("section-renamed")
-                                    
-                                    class_str = " ".join(classes)
-                                    
-                                    # Different display for renamed sections
-                                    if show_renames and section.get("isRenamed"):
-                                        previous_title = section.get("previousTitle", "Unknown")
-                                        st.markdown(f"""
-                                            <div class="section-container">
-                                                {indent}<span class="section-title {class_str} tooltip">
-                                                    {section["title"]}
-                                                    <span class="rename-indicator">↺</span>
-                                                    <span class="tooltiptext">Renamed from: {previous_title}</span>
-                                                </span>
+                                        header_html = f'''
+                                        <div class="year-header">
+                                            {display_date}
+                                            <div class="significance-indicator" title="Significance: {significance_value}/10">
+                                                <span style="color: #9333ea; font-size: 0.8em;">{significance_indicator}</span>
                                             </div>
-                                        """, unsafe_allow_html=True)
+                                            <div class="change-summary" style="font-size: 0.8em; font-weight: normal; margin-top: 4px;">
+                                                {data.get('change_summary', '')}
+                                            </div>
+                                        </div>
+                                        '''
+                                        st.markdown(header_html, unsafe_allow_html=True)
                                     else:
-                                        st.markdown(f"""
-                                            <div class="section-container">
-                                                {indent}<span class="section-title {class_str}">
-                                                    {section["title"]}
-                                                </span>
-                                            </div>
-                                        """, unsafe_allow_html=True)
-                                
-                                if "removed" in data:
-                                    for removed_section in data["removed"]:
-                                        st.markdown(f"""
-                                            <div class="section-container">
-                                                <span class="section-title" style="background-color: #fee2e2;">
-                                                    {removed_section}
-                                                </span>
-                                            </div>
-                                        """, unsafe_allow_html=True)
+                                        # Original yearly view
+                                        st.markdown(f'<div class="year-header">{key}</div>', 
+                                                  unsafe_allow_html=True)        
+                                    for section in data["sections"]:
+                                        indent = "&nbsp;" * (4 * (section["level"] - 1))
+                                        classes = []
+                                        if section.get("isNew"):
+                                            classes.append("section-new")
+                                        if show_renames and section.get("isRenamed"):
+                                            classes.append("section-renamed")
                                         
-                    elif view_mode == "Edit Activity":
-                        # Define constants first
-                        max_edits = 15
+                                        class_str = " ".join(classes)
+                                        
+                                        # Different display for renamed sections
+                                        if show_renames and section.get("isRenamed"):
+                                            previous_title = section.get("previousTitle", "Unknown")
+                                            st.markdown(f"""
+                                                <div class="section-container">
+                                                    {indent}<span class="section-title {class_str} tooltip">
+                                                        {section["title"]}
+                                                        <span class="rename-indicator">↺</span>
+                                                        <span class="tooltiptext">Renamed from: {previous_title}</span>
+                                                    </span>
+                                                </div>
+                                            """, unsafe_allow_html=True)
+                                        else:
+                                            st.markdown(f"""
+                                                <div class="section-container">
+                                                    {indent}<span class="section-title {class_str}">
+                                                        {section["title"]}
+                                                    </span>
+                                                </div>
+                                            """, unsafe_allow_html=True)
+                                    
+                                    if "removed" in data:
+                                        for removed_section in data["removed"]:
+                                            st.markdown(f"""
+                                                <div class="section-container">
+                                                    <span class="section-title" style="background-color: #fee2e2;">
+                                                        {removed_section}
+                                                    </span>
+                                                </div>
+                                            """, unsafe_allow_html=True)
+                                            
+                        elif view_mode == "Edit Activity":
+                            # Define constants first
+                            max_edits = 15
 
                         # Color scaling function
                         def get_color(value, max_edits=15):

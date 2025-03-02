@@ -879,10 +879,10 @@ if wiki_page:
                             except:
                                 return key  # Return as is on any error
                                 
-                        # Display timeline columns - ensure we have valid entries with sections
                         # Display timeline columns
-                        # Skip metadata entry if present
-                        display_items = {k: v for k, v in toc_history.items() if k != "_metadata" and isinstance(v, dict) and "sections" in v}
+                        # Skip metadata entry if present and ensure each item has sections
+                        display_items = {k: v for k, v in toc_history.items() 
+                                        if k != "_metadata" and isinstance(v, dict) and "sections" in v}
                         
                         if not display_items:
                             st.warning("No TOC versions found with the current settings. Try adjusting the significance threshold.")
@@ -892,8 +892,9 @@ if wiki_page:
                                 with cols[idx]:
                                     # Show revision date and change summary for significant mode
                                     if st.session_state.toc_version_mode == "Significant Changes":
-                                        display_date = format_display_date(key)
+                                        display_date = format_display_date(key)  # Format date if it's a date
                                         significance_value = data.get("significance", 0)
+                                        # Ensure at least 1 star for visual feedback
                                         significance_indicator = "★" * max(1, min(5, round(significance_value/2)))
                                         
                                         header_html = f'''

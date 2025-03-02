@@ -197,6 +197,7 @@ def detect_renamed_sections(prev_sections, curr_sections):
     
     return renamed_sections
 
+# AFTER (the corrected function)
 def calculate_toc_change_significance(current_sections, previous_sections):
     """
     Calculate the significance of changes between two TOC versions.
@@ -220,41 +221,44 @@ def calculate_toc_change_significance(current_sections, previous_sections):
         # Skip empty sets
         if not current_set or not previous_set:
             return 5, "Empty section data"
-    
-    # Calculate changes
-    added = current_set - previous_set
-    removed = previous_set - current_set
-    total_changes = len(added) + len(removed)
-    
-    # Check for hierarchy changes (level changes)
-    hierarchy_changes = 0
-    common_sections = current_set.intersection(previous_set)
-    
-    # Create lookup dictionaries
-    current_lookup = {s["title"]: s["level"] for s in current_sections}
-    previous_lookup = {s["title"]: s["level"] for s in previous_sections}
-    
-    for section in common_sections:
-        if section in current_lookup and section in previous_lookup:
-            if current_lookup[section] != previous_lookup[section]:
-                hierarchy_changes += 1
-    
-    # Calculate significance score (scale of 1-10)
-    # More weight to removed sections as they're often more significant
-    significance = min(10, (total_changes * 2 + hierarchy_changes * 3) / 2)
-    
-    # Create change summary
-    summary = []
-    if added:
-        summary.append(f"Added {len(added)} section(s)")
-    if removed:
-        summary.append(f"Removed {len(removed)} section(s)")
-    if hierarchy_changes:
-        summary.append(f"Changed level of {hierarchy_changes} section(s)")
-    
-    change_summary = ", ".join(summary) if summary else "Minor changes"
-    
-    return significance, change_summary
+        
+        # Calculate changes
+        added = current_set - previous_set
+        removed = previous_set - current_set
+        total_changes = len(added) + len(removed)
+        
+        # Check for hierarchy changes (level changes)
+        hierarchy_changes = 0
+        common_sections = current_set.intersection(previous_set)
+        
+        # Create lookup dictionaries
+        current_lookup = {s.get("title", ""): s.get("level", 0) for s in current_sections if isinstance(s, dict) and "title" in s}
+        previous_lookup = {s.get("title", ""): s.get("level", 0) for s in previous_sections if isinstance(s, dict) and "title" in s}
+        
+        for section in common_sections:
+            if section in current_lookup and section in previous_lookup:
+                if current_lookup[section] != previous_lookup[section]:
+                    hierarchy_changes += 1
+        
+        # Calculate significance score (scale of 1-10)
+        # More weight to removed sections as they're often more significant
+        significance = min(10, (total_changes * 2 + hierarchy_changes * 3) / 2)
+        
+        # Create change summary
+        summary = []
+        if added:
+            summary.append(f"Added {len(added)} section(s)")
+        if removed:
+            summary.append(f"Removed {len(removed)} section(s)")
+        if hierarchy_changes:
+            summary.append(f"Changed level of {hierarchy_changes} section(s)")
+        
+        change_summary = ", ".join(summary) if summary else "Minor changes"
+        
+        return significance, change_summary
+    except Exception as e:
+        # Add this except block to handle any errors
+        return 5, f"Error calculating significance: {str(e)}"
 
 def process_revision_history(title, mode="yearly", significance_threshold=5):
     """

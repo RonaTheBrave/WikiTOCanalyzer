@@ -954,15 +954,16 @@ if wiki_page:
                                                     </span>
                                                 </div>
                                             """, unsafe_allow_html=True)
-                        elif view_mode == "Edit Activity":
-                            # Define constants first
-                            max_edits = 15
-                        
-                            # Color scaling function
-                            def get_color(value, max_edits=15):
-                                intensity = value / max_edits
-                                rgb_value = round(255 * (1 - intensity))
-                                return f'rgb(255, {rgb_value}, {rgb_value})'
+                                            
+                    elif view_mode == "Edit Activity":
+                        # Define constants first
+                        max_edits = 15
+                    
+                        # Color scaling function
+                        def get_color(value, max_edits=15):
+                            intensity = value / max_edits
+                            rgb_value = round(255 * (1 - intensity))
+                            return f'rgb(255, {rgb_value}, {rgb_value})'
 
 
                         # Show current rename detection status

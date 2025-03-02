@@ -637,6 +637,11 @@ if wiki_page:
                         if year != "_metadata" and data.get("renamed"):
                             for new_name, old_name in data["renamed"].items():
                                 rename_summary.append(f"{year}: '{old_name}' → '{new_name}'")
+                    rename_summary = []
+                    for year, data in sorted(toc_history.items()):
+                        if year != "_metadata" and data.get("renamed"):
+                            for new_name, old_name in data["renamed"].items():
+                                rename_summary.append(f"{year}: '{old_name}' → '{new_name}'")
                     
                     if rename_summary:
                         with st.expander("Section Renames Detected"):
@@ -696,14 +701,16 @@ if wiki_page:
                             # Prepare CSV data
                             csv_data = []
                             for year, data in sorted(toc_history.items()):
-                                for section in data["sections"]:
-                                    csv_data.append({
-                                        'Year': year,
-                                        'Section': section['title'],
-                                        'Level': section['level'],
-                                        'Status': 'New' if section.get('isNew') else 'Existing'
-                                    })
+                                if year != "_metadata" and isinstance(data, dict) and "sections" in data:
+                                    for section in data["sections"]:
+                                        csv_data.append({
+                                            'Year': year,
+                                            'Section': section['title'],
+                                            'Level': section['level'],
+                                            'Status': 'New' if section.get('isNew') else 'Existing'
+                                        })
                             csv_df = pd.DataFrame(csv_data)
+
                             st.download_button(
                                 "↓",
                                 data=csv_df.to_csv(index=False),

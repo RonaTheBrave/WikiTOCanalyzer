@@ -558,24 +558,35 @@ with st.sidebar:
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     
-    # TOC Version Selection
-    st.subheader("TOC Version Selection")
-    toc_version_mode = st.radio(
-        "Show TOC versions:",
-        ["Yearly Snapshots", "Significant Changes"],
-        key="toc_version_mode",
-        help="Choose how TOC versions are selected. Yearly shows one version per year, Significant shows versions where important changes occurred."
-    )
-    
-    # Add significance threshold if "Significant Changes" is selected
-    if toc_version_mode == "Significant Changes":
-        significance_threshold = st.slider(
-            "Significance Threshold", 
-            min_value=1, 
-            max_value=10, 
-            value=5,
-            help="Higher values show fewer revisions with more important changes. Lower values show more revisions with smaller changes."
+    # Only show TOC Version Selection for Timeline View
+    if view_mode == "Timeline View":
+        st.subheader("TOC Version Selection")
+        toc_version_mode = st.radio(
+            "Show TOC versions:",
+            ["Yearly Snapshots", "Significant Changes"],
+            key="toc_version_mode",
+            help="Choose how TOC versions are selected. Yearly shows one version per year, Significant shows versions where important changes occurred."
         )
+        
+        # Add significance threshold if "Significant Changes" is selected
+        if toc_version_mode == "Significant Changes":
+            significance_threshold = st.slider(
+                "Significance Threshold", 
+                min_value=1, 
+                max_value=10, 
+                value=5,
+                help="Controls which TOC changes appear. Higher values (8-10): major reorganizations only. " +
+                    "Medium values (4-7): notable section changes. Lower values (1-3): includes minor changes " +
+                    "like capitalization. Based on added, removed, renamed sections and hierarchy changes."
+            )
+    else:
+        # Set default value for other tabs
+        if "toc_version_mode" not in st.session_state:
+            st.session_state.toc_version_mode = "Yearly Snapshots"
+        
+        # Create a hidden variable to prevent errors
+        if st.session_state.toc_version_mode == "Significant Changes" and "significance_threshold" not in st.session_state:
+            st.session_state.significance_threshold = 5
     
     st.subheader("Display Options")
     show_renames = st.toggle("Enable Rename Detection", True,
@@ -719,6 +730,7 @@ if wiki_page:
                                 help="Download data as CSV"
                             )
 
+                        
                         # Add legend
                         st.markdown("""
                             <div style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem;">
@@ -733,6 +745,12 @@ if wiki_page:
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <div style="width: 12px; height: 12px; border-radius: 3px; background-color: #fee2e2;"></div>
                                     <span>Sections to be removed</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="display: flex; color: #9333ea; letter-spacing: -1px;">
+                                        <span>●●●●●</span>
+                                    </div>
+                                    <span>Significance rating (1-5)</span>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -902,14 +920,16 @@ if wiki_page:
                                     if st.session_state.toc_version_mode == "Significant Changes":
                                         display_date = format_display_date(key)  # Format date if it's a date
                                         significance_value = data.get("significance", 0)
-                                        # Ensure at least 1 star for visual feedback
-                                        significance_indicator = "★" * max(1, min(5, round(significance_value/2)))
+                                        # Calculate how many dots should be filled (out of 5)
+                                        filled_dots = max(1, min(5, round(significance_value/2)))
+                                        # Create string of filled and unfilled dots
+                                        significance_indicator = "●" * filled_dots + "<span style='opacity: 0.3;'>●</span>" * (5 - filled_dots)
                                         
                                         header_html = f'''
                                         <div class="year-header">
                                             {display_date}
                                             <div class="significance-indicator" title="Significance: {significance_value}/10">
-                                                <span style="color: #9333ea; font-size: 0.8em;">{significance_indicator}</span>
+                                                <span style="color: #9333ea; letter-spacing: -1px;">{significance_indicator}</span>
                                             </div>
                                             <div class="change-summary" style="font-size: 0.8em; font-weight: normal; margin-top: 4px;">
                                                 {data.get('change_summary', '')}

@@ -196,118 +196,165 @@ def detect_renamed_sections(prev_sections, curr_sections):
             added_titles.remove(best_match)  # Remove to prevent multiple matches
     
     return renamed_sections
-    
-def process_revision_history(title):
+
+def calculate_toc_change_significance(current_sections, previous_sections):
     """
-    Process revision history and extract TOC with enhanced path tracking
+    Calculate the significance of changes between two TOC versions.
+    Returns a significance score and change summary.
+    """
+    if previous_sections is None:
+        # First version is always significant
+        return 10, "Initial version"
+    
+    current_set = {s["title"] for s in current_sections}
+    previous_set = {s["title"] for s in previous_sections}
+    
+    # Calculate changes
+    added = current_set - previous_set
+    removed = previous_set - current_set
+    total_changes = len(added) + len(removed)
+    
+    # Check for hierarchy changes (level changes)
+    hierarchy_changes = 0
+    common_sections = current_set.intersection(previous_set)
+    
+    # Create lookup dictionaries
+    current_lookup = {s["title"]: s["level"] for s in current_sections}
+    previous_lookup = {s["title"]: s["level"] for s in previous_sections}
+    
+    for section in common_sections:
+        if section in current_lookup and section in previous_lookup:
+            if current_lookup[section] != previous_lookup[section]:
+                hierarchy_changes += 1
+    
+    # Calculate significance score (scale of 1-10)
+    # More weight to removed sections as they're often more significant
+    significance = min(10, (total_changes * 2 + hierarchy_changes * 3) / 2)
+    
+    # Create change summary
+    summary = []
+    if added:
+        summary.append(f"Added {len(added)} section(s)")
+    if removed:
+        summary.append(f"Removed {len(removed)} section(s)")
+    if hierarchy_changes:
+        summary.append(f"Changed level of {hierarchy_changes} section(s)")
+    
+    change_summary = ", ".join(summary) if summary else "Minor changes"
+    
+    return significance, change_summary
+
+# AFTER
+def process_revision_history(title, mode="yearly", significance_threshold=5):
+    """
+    Process revision history and extract TOC
+    
+    Parameters:
+    - title: Wikipedia page title
+    - mode: "yearly" for one revision per year, "significant" for significant changes
+    - significance_threshold: threshold for significant changes (1-10 scale)
     """
     revisions = get_page_history(title)
     
-    yearly_revisions = {}
+    # Dictionary to store revisions by key (year or revision id)
+    toc_revisions = {}
     years_processed = set()
     previous_sections = None
-    previous_section_paths = {}  # Track full section paths
+    prev_sections_data = None
+    
+    # Track all significant revisions with timestamps
+    significant_revisions = []
     
     for rev in reversed(revisions):
-        year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
+        timestamp = rev['timestamp']
+        date = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
+        year = date.year
+        revision_id = rev['revid']
         
-        if year not in years_processed and year >= 2019:
-            content = get_revision_content(title, rev['revid'])
-            if content:
-                sections = extract_toc(content)
-                current_sections = {s["title"] for s in sections}
-                
-                # Build current section paths
-                current_section_paths = {}
-                
-                # First pass: find all level 1 sections
-                level1_sections = [s for s in sections if s["level"] == 1]
-                
-                # Second pass: assign paths
-                for section in sections:
-                    if section["level"] == 1:
-                        # Top-level sections have their name as path
-                        current_section_paths[section["title"]] = section["title"]
-                    else:
-                        # Find the most recent parent section
-                        parent_idx = -1
-                        for i, s in enumerate(sections):
-                            idx = sections.index(section)
-                            if i < idx and s["level"] < section["level"]:
-                                parent_idx = i
-                        
-                        if parent_idx >= 0:
-                            parent = sections[parent_idx]
-                            parent_path = current_section_paths.get(parent["title"], parent["title"])
-                            current_section_paths[section["title"]] = f"{parent_path} > {section['title']}"
-                        else:
-                            # Fallback if we can't find a parent
-                            current_section_paths[section["title"]] = section["title"]
-                
-                # Detect renamed sections
-                renamed_sections = {}
-                removed_sections = set()
-                
-                if previous_sections is not None and st.session_state.get('show_renames', True):
-                    # Basic rename detection based on titles - only if enabled
-                    print(f"DEBUG: Running rename detection for year {year}")
-                    renamed_sections = detect_renamed_sections(previous_sections, current_sections)
-                    print(f"DEBUG: Found {len(renamed_sections)} renames for year {year}")
-                    
-                    # Further refine based on paths
-                    for new_title, old_title in list(renamed_sections.items()):
-                        if old_title in previous_section_paths and new_title in current_section_paths:
-                            old_path = previous_section_paths[old_title]
-                            new_path = current_section_paths[new_title]
-                            
-                            # If paths are completely different, maybe it's not a rename
-                            if '>' in old_path and '>' in new_path:
-                                old_parent = old_path.split(' > ')[0]
-                                new_parent = new_path.split(' > ')[0]
-                                
-                                # If parents are different and not similar, probably not a rename
-                                if old_parent != new_parent and SequenceMatcher(None, old_parent.lower(), new_parent.lower()).ratio() < 0.5:
-                                    del renamed_sections[new_title]
-                    
-                    removed_sections = previous_sections - current_sections - set(renamed_sections.values())
-                
-                # Mark sections as new or renamed
-                for section in sections:
-                    section_title = section["title"]
-                    # Assign path to section for visualization
-                    section["path"] = current_section_paths.get(section_title, section_title)
-                    
-                    if previous_sections is None or section_title not in previous_sections:
-                        if section_title in renamed_sections:
-                            section["isRenamed"] = True
-                            section["previousTitle"] = renamed_sections[section_title]
-                            # Store the full path history
-                            if renamed_sections[section_title] in previous_section_paths:
-                                section["previousPath"] = previous_section_paths[renamed_sections[section_title]]
-                        else:
-                            section["isNew"] = True
-                
-                # Debug renamed sections count
-                renamed_count = sum(1 for s in sections if s.get("isRenamed", False))
-                if renamed_count > 0:
-                    print(f"DEBUG: Marked {renamed_count} sections as renamed in year {year}")
-                    # Print the first 3 renamed sections
-                    for i, s in enumerate([s for s in sections if s.get("isRenamed", False)][:3]):
-                        print(f"  - '{s['previousTitle']}' → '{s['title']}'")
-                        
-                data = {
-                    "sections": sections,
-                    "removed": removed_sections,
-                    "renamed": renamed_sections,
-                    "paths": current_section_paths
-                }
-                
-                yearly_revisions[str(year)] = data
-                previous_sections = current_sections
-                previous_section_paths = current_section_paths
+        # Skip years before 2019
+        if year < 2019:
+            continue
+            
+        # For yearly mode, skip if we already have this year
+        if mode == "yearly" and year in years_processed:
+            continue
+            
+        # Get content and extract TOC
+        content = get_revision_content(title, revision_id)
+        if not content:
+            continue
+            
+        sections = extract_toc(content)
+        current_sections = {s["title"] for s in sections}
+        
+        # Calculate significance for this change
+        significance, change_summary = calculate_toc_change_significance(sections, prev_sections_data)
+        
+        # Decide whether to include this revision
+        include_revision = False
+        
+        if mode == "yearly":
+            # Include if this is the first revision for the year
+            if year not in years_processed:
+                include_revision = True
                 years_processed.add(year)
+                revision_key = str(year)
+        else:  # significant mode
+            # Include if this is a significant change
+            if significance >= significance_threshold:
+                include_revision = True
+                # Use timestamp as key for significant revisions
+                formatted_date = date.strftime("%Y-%m-%d")
+                revision_key = formatted_date
+                significant_revisions.append({
+                    "date": formatted_date,
+                    "significance": significance,
+                    "summary": change_summary,
+                    "revid": revision_id
+                })
+        
+        if include_revision:
+            # Process the TOC data
+            renamed_sections = {}
+            removed_sections = set()
+            
+            if previous_sections is not None:
+                renamed_sections = detect_renamed_sections(previous_sections, current_sections)
+                removed_sections = previous_sections - current_sections - set(renamed_sections.values())
+            
+            # Mark sections as new or renamed
+            for section in sections:
+                section_title = section["title"]
+                if previous_sections is None or section_title not in previous_sections:
+                    if section_title in renamed_sections:
+                        section["isRenamed"] = True
+                        section["previousTitle"] = renamed_sections[section_title]
+                    else:
+                        section["isNew"] = True
+            
+            data = {
+                "sections": sections,
+                "removed": removed_sections,
+                "renamed": renamed_sections,
+                "timestamp": timestamp,
+                "revid": revision_id,
+                "significance": significance,
+                "change_summary": change_summary
+            }
+            
+            toc_revisions[revision_key] = data
+            
+            # Update previous sections for the next iteration
+            previous_sections = current_sections
+            prev_sections_data = sections
     
-    return yearly_revisions
+    # For significant mode, also include metadata about all significant revisions
+    if mode == "significant":
+        toc_revisions["_metadata"] = {
+            "significant_revisions": significant_revisions
+        }
+    
+    return toc_revisions
     
 def create_section_count_chart(toc_history):
     """
@@ -487,6 +534,7 @@ st.title("Wikipedia Table of Contents History Viewer")
 st.write("This tool shows how the table of contents structure has evolved over time")
 
 # Input section
+# AFTER
 with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
@@ -495,8 +543,26 @@ with st.sidebar:
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     
-    # Enhanced rename detection controls
-    st.subheader("Rename Detection")
+    # TOC Version Selection
+    st.subheader("TOC Version Selection")
+    toc_version_mode = st.radio(
+        "Show TOC versions:",
+        ["Yearly Snapshots", "Significant Changes"],
+        key="toc_version_mode",
+        help="Choose how TOC versions are selected. Yearly shows one version per year, Significant shows versions where important changes occurred."
+    )
+    
+    # Add significance threshold if "Significant Changes" is selected
+    if toc_version_mode == "Significant Changes":
+        significance_threshold = st.slider(
+            "Significance Threshold", 
+            min_value=1, 
+            max_value=10, 
+            value=5,
+            help="Higher values show fewer revisions with more important changes. Lower values show more revisions with smaller changes."
+        )
+    
+    st.subheader("Display Options")
     show_renames = st.toggle("Enable Rename Detection", True,
                            help="When enabled, detects and highlights sections that were renamed")
     
@@ -539,7 +605,14 @@ if wiki_page:
                 st.success("Successfully retrieved current version")
                 current_sections = extract_toc(current_content)
                 
-                toc_history = process_revision_history(wiki_page)
+                toc_mode = "yearly" if st.session_state.toc_version_mode == "Yearly Snapshots" else "significant"
+                significance_value = significance_threshold if toc_mode == "significant" else 5
+                
+                toc_history = process_revision_history(
+                    wiki_page, 
+                    mode=toc_mode,
+                    significance_threshold=significance_value
+                )
                 
                 if toc_history:
                     st.success(f"Found historical versions from {len(toc_history)} different years")
@@ -738,6 +811,17 @@ if wiki_page:
                                 position: relative;
                                 display: inline-block;
                             }
+                            .significance-indicator {
+                                display: inline-block;
+                                margin-left: 4px;
+                                color: #9333ea;
+                            }
+                            .change-summary {
+                                color: #4b5563;
+                                white-space: normal;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                            }
                             .tooltip .tooltiptext {
                                 visibility: hidden;
                                 width: 180px;
@@ -771,12 +855,33 @@ if wiki_page:
                         st.markdown(css, unsafe_allow_html=True)
                         
                         # Display timeline columns
-                        cols = st.columns(len(toc_history))
-                        for idx, (year, data) in enumerate(sorted(toc_history.items())):
+                        # Skip metadata entry if present
+                        display_items = {k: v for k, v in toc_history.items() if k != "_metadata"}
+                        
+                        cols = st.columns(len(display_items))
+                        for idx, (key, data) in enumerate(sorted(display_items.items())):
                             with cols[idx]:
-                                st.markdown(f'<div class="year-header">{year}</div>', 
-                                          unsafe_allow_html=True)
-                                
+                                # Show revision date and change summary for significant mode
+                                if st.session_state.toc_version_mode == "Significant Changes":
+                                    display_date = key  # Already formatted as YYYY-MM-DD
+                                    significance_indicator = "★" * min(5, round(data.get("significance", 0)/2))
+                                    
+                                    header_html = f'''
+                                    <div class="year-header">
+                                        {display_date}
+                                        <div class="significance-indicator" title="Significance: {data.get('significance', 0)}/10">
+                                            <span style="color: #9333ea; font-size: 0.8em;">{significance_indicator}</span>
+                                        </div>
+                                        <div class="change-summary" style="font-size: 0.8em; font-weight: normal; margin-top: 4px;">
+                                            {data.get('change_summary', '')}
+                                        </div>
+                                    </div>
+                                    '''
+                                    st.markdown(header_html, unsafe_allow_html=True)
+                                else:
+                                    # Original yearly view
+                                    st.markdown(f'<div class="year-header">{key}</div>', 
+                                              unsafe_allow_html=True)        
                                 for section in data["sections"]:
                                     indent = "&nbsp;" * (4 * (section["level"] - 1))
                                     classes = []
@@ -817,6 +922,7 @@ if wiki_page:
                                                 </span>
                                             </div>
                                         """, unsafe_allow_html=True)
+                                        
                     elif view_mode == "Edit Activity":
                         # Define constants first
                         max_edits = 15

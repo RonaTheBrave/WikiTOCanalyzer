@@ -377,14 +377,15 @@ def create_section_count_chart(toc_history):
     """
     data = []
     for year, content in sorted(toc_history.items()):
-        level_counts = {}
-        for section in content["sections"]:
-            level = section["level"]
-            level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
-        
-        row = {"Year": year}
-        row.update(level_counts)
-        data.append(row)
+        if year != "_metadata" and "sections" in content:
+            level_counts = {}
+            for section in content["sections"]:
+                level = section["level"]
+                level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
+            
+            row = {"Year": year}
+            row.update(level_counts)
+            data.append(row)
     
     df = pd.DataFrame(data)
     
@@ -633,7 +634,7 @@ if wiki_page:
                     
                     rename_summary = []
                     for year, data in sorted(toc_history.items()):
-                        if data.get("renamed"):
+                        if year != "_metadata" and data.get("renamed"):
                             for new_name, old_name in data["renamed"].items():
                                 rename_summary.append(f"{year}: '{old_name}' → '{new_name}'")
                     
@@ -647,7 +648,7 @@ if wiki_page:
                         st.write("Checking TOC history structure")
                         rename_found = False
                         for year, data in sorted(toc_history.items()):
-                            if "renamed" in data and data["renamed"]:
+                            if year != "_metadata" and "renamed" in data and data["renamed"]:
                                 rename_found = True
                                 st.write(f"Year {year} has {len(data['renamed'])} renames in TOC history")
                                 # Display first 3 renames
@@ -979,7 +980,7 @@ if wiki_page:
                             st.write("Checking for rename data in TOC history...")
                             rename_count = 0
                             for year, data in sorted(toc_history.items()):
-                                if data.get("renamed"):
+                                if year != "_metadata" and data.get("renamed"):
                                     st.write(f"Year {year}: {len(data['renamed'])} renames found")
                                     rename_count += len(data['renamed'])
                                     
@@ -1289,13 +1290,14 @@ if wiki_page:
                         # Prepare CSV data
                         csv_data = []
                         for year, content in sorted(toc_history.items()):
-                            level_counts = {}
-                            for section in content["sections"]:
-                                level = section["level"]
-                                level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
-                            row = {"Year": year}
-                            row.update(level_counts)
-                            csv_data.append(row)
+                            if year != "_metadata" and "sections" in content:
+                                level_counts = {}
+                                for section in content["sections"]:
+                                    level = section["level"]
+                                    level_counts[f"Level {level}"] = level_counts.get(f"Level {level}", 0) + 1
+                                row = {"Year": year}
+                                row.update(level_counts)
+                                csv_data.append(row)
                         
                         csv_df = pd.DataFrame(csv_data)
                         

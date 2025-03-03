@@ -558,14 +558,12 @@ with st.sidebar:
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
     
-    # Only show TOC Version Selection for Timeline View
-    if view_mode == "Timeline View":
-        # First define the view mode
-        view_mode = st.radio(
-            "Analysis Mode",
-            ["Timeline View", "Edit Activity", "Section Count"],
-            key="view_mode"
-        )
+    # First define the view mode
+    view_mode = st.radio(
+        "Analysis Mode",
+        ["Timeline View", "Edit Activity", "Section Count"],
+        key="view_mode"
+    )
         
         # Only show TOC Version Selection for Timeline View
         if view_mode == "Timeline View":

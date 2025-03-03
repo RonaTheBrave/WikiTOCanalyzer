@@ -549,21 +549,21 @@ st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 st.title("Wikipedia Table of Contents History Viewer")
 st.write("This tool shows how the table of contents structure has evolved over time")
 
-# Input section
-    with st.sidebar:
-        st.header("Settings")
-        wiki_page = st.text_input(
-            "Enter Wikipedia Page Title",
-            "Opioid-induced hyperalgesia",
-            help="Enter the exact title as it appears in the Wikipedia URL"
-        )
-        
-        # First define the view mode
-        view_mode = st.radio(
-            "Analysis Mode",
-            ["Timeline View", "Edit Activity", "Section Count"],
-            key="view_mode"
-        )
+    # Input section
+        with st.sidebar:
+            st.header("Settings")
+            wiki_page = st.text_input(
+                "Enter Wikipedia Page Title",
+                "Opioid-induced hyperalgesia",
+                help="Enter the exact title as it appears in the Wikipedia URL"
+            )
+            
+            # First define the view mode
+            view_mode = st.radio(
+                "Analysis Mode",
+                ["Timeline View", "Edit Activity", "Section Count"],
+                key="view_mode"
+            )
         
         # Only show TOC Version Selection for Timeline View
         if view_mode == "Timeline View":

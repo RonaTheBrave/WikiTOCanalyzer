@@ -583,29 +583,52 @@ with st.sidebar:
     # Year range selector
     st.subheader("Time Range")
     
-    # Set default min and max years
-    min_year_default = 2010
-    max_year_default = datetime.now().year
+    # Add toggle between Entire Range and Custom Range
+    range_mode = st.radio(
+        "Range Selection",
+        ["Entire Range", "Custom Range"],
+        key="range_mode",
+        horizontal=True,
+        help="Select 'Entire Range' to analyze all available data or 'Custom Range' to specify years"
+    )
     
-    # Create year range selection with min and max sliders
-    col1, col2 = st.columns(2)
-    with col1:
-        start_year = st.number_input("Start Year", 
+    # Only show year range inputs if Custom Range is selected
+    if range_mode == "Custom Range":
+        # Set default min and max years
+        min_year_default = 2010
+        max_year_default = datetime.now().year
+        
+        # Create year range selection with min and max sliders
+        col1, col2 = st.columns(2)
+        with col1:
+            start_year = st.number_input("Start Year", 
+                                        min_value=1990, 
+                                        max_value=max_year_default,
+                                        value=min_year_default,
+                                        step=1)
+        with col2:
+            end_year = st.number_input("End Year", 
                                     min_value=1990, 
-                                    max_value=max_year_default,
-                                    value=min_year_default,
+                                    max_value=max_year_default + 1,
+                                    value=max_year_default,
                                     step=1)
-    with col2:
-        end_year = st.number_input("End Year", 
-                                   min_value=1990, 
-                                   max_value=max_year_default + 1,
-                                   value=max_year_default,
-                                   step=1)
-    
-    # Ensure start_year <= end_year
-    if start_year > end_year:
-        st.warning("Start year cannot be after end year. Adjusting end year.")
-        end_year = start_year
+        
+        # Ensure start_year <= end_year
+        if start_year > end_year:
+            st.warning("Start year cannot be after end year. Adjusting end year.")
+            end_year = start_year
+            
+        # Add auto-detect toggle
+        use_auto_range = st.toggle(
+            "Auto-detect available years", 
+            value=True, 
+            help="When enabled, automatically adjusts the year range based on available data"
+        )
+    else:
+        # Set default values for when Entire Range is selected
+        start_year = 1990  # A very early year to effectively include everything
+        end_year = datetime.now().year + 1  # Future year to include everything
+        use_auto_range = True  # Always auto-detect when Entire Range is selected
     
     # First define the view mode
     view_mode = st.radio(
@@ -677,6 +700,34 @@ with st.sidebar:
 if wiki_page:
     try:
         with st.spinner("Analyzing page history..."):
+            # Display the range mode being used
+            if range_mode == "Entire Range":
+                st.info("Analyzing the entire available history of the article")
+            else:
+                st.info(f"Analyzing custom time range: {start_year} to {end_year}")
+            
+            # If auto-detect is enabled, get the available years
+            if use_auto_range:
+                with st.spinner("Detecting available years..."):
+                    min_available_year, max_available_year = get_page_year_range(wiki_page)
+                    if min_available_year and max_available_year:
+                        original_start = start_year
+                        original_end = end_year
+                        
+                        if range_mode == "Entire Range":
+                            # For Entire Range, just use the detected min and max years
+                            start_year = min_available_year
+                            end_year = max_available_year
+                            st.success(f"Found article history from {min_available_year} to {max_available_year}")
+                        else:
+                            # For Custom Range, adjust the range to available data
+                            start_year = max(start_year, min_available_year)
+                            end_year = min(end_year, max_available_year)
+                            
+                            # If the range was adjusted, show info
+                            if original_start != start_year or original_end != end_year:
+                                st.sidebar.info(f"Adjusted range to available years: {start_year} to {end_year}")
+            
             current_content = get_revision_content(wiki_page)
             if current_content:
                 st.success("Successfully retrieved current version")
@@ -685,6 +736,7 @@ if wiki_page:
                 toc_mode = "yearly" if st.session_state.toc_version_mode == "Yearly Snapshots" else "significant"
                 significance_value = significance_threshold if toc_mode == "significant" else 5
                 
+                # Pass the year range to process_revision_history
                 toc_history = process_revision_history(
                     wiki_page, 
                     mode=toc_mode,
@@ -696,9 +748,15 @@ if wiki_page:
                 if toc_history:
                     years_count = len([k for k in toc_history.keys() if k != "_metadata"])
                     if years_count > 0:
-                        st.success(f"Found {years_count} historical versions from {start_year} to {end_year}")
+                        if range_mode == "Entire Range":
+                            st.success(f"Found {years_count} historical versions")
+                        else:
+                            st.success(f"Found {years_count} historical versions from {start_year} to {end_year}")
                     else:
-                        st.warning(f"No historical versions found in the selected time range ({start_year} - {end_year}). Try expanding your time range.")
+                        if range_mode == "Custom Range":
+                            st.warning(f"No historical versions found in the selected time range ({start_year} - {end_year}). Try expanding your time range.")
+                        else:
+                            st.warning("No historical versions found for this article.")
                     
                     rename_summary = []
                     for year, data in sorted(toc_history.items()):

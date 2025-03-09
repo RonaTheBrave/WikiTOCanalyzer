@@ -40,6 +40,57 @@ def get_revision_content(title, revid=None):
         st.error(f"Error in API request: {str(e)}")
         return None
 
+def get_page_year_range(title):
+    """
+    Get the year range of a Wikipedia page more efficiently.
+    Only fetches metadata, not full content.
+    """
+    api_url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "format": "json",
+        "prop": "revisions",
+        "titles": title,
+        "rvprop": "ids|timestamp",
+        "rvlimit": "1",
+        "rvdir": "older",
+        "formatversion": "2"
+    }
+    
+    try:
+        # Get oldest revision first
+        response = requests.get(api_url, params=params)
+        data = response.json()
+        
+        if 'query' in data and 'pages' in data['query']:
+            page = data['query']['pages'][0]
+            if 'missing' in page:
+                return None, None
+            if 'revisions' in page:
+                oldest_timestamp = page['revisions'][0]['timestamp']
+                oldest_date = datetime.strptime(oldest_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+                oldest_year = oldest_date.year
+                
+                # Now get newest revision
+                params["rvdir"] = "newer"
+                response = requests.get(api_url, params=params)
+                data = response.json()
+                
+                if 'query' in data and 'pages' in data['query']:
+                    page = data['query']['pages'][0]
+                    if 'revisions' in page:
+                        newest_timestamp = page['revisions'][0]['timestamp']
+                        newest_date = datetime.strptime(newest_timestamp, "%Y-%m-%dT%H:%M:%SZ")
+                        newest_year = newest_date.year
+                        
+                        return oldest_year, newest_year
+                
+        return None, None
+            
+    except Exception as e:
+        st.error(f"Error detecting year range: {str(e)}")
+        return None, None
+
 def get_page_history(title):
     """
     Fetch list of revisions for a Wikipedia page

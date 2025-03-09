@@ -671,7 +671,7 @@ if wiki_page:
                 toc_history = process_revision_history(
                     wiki_page, 
                     mode=toc_mode,
-                    significance_threshold=significance_value
+                    significance_threshold=significance_value,
                     start_year=start_year,
                     end_year=end_year
                 )

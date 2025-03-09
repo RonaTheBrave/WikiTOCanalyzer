@@ -197,7 +197,6 @@ def detect_renamed_sections(prev_sections, curr_sections):
     
     return renamed_sections
 
-# AFTER (the corrected function)
 def calculate_toc_change_significance(current_sections, previous_sections):
     """
     Calculate the significance of changes between two TOC versions.
@@ -548,6 +547,24 @@ def calculate_edit_activity(revisions, title, toc_history=None):
 
     return sorted(formatted_data, key=lambda x: x['section'].lower())  # Sort by lowercase name for consistency
 
+def get_revision_url(title, revision_id):
+    """
+    Generate a URL to a specific Wikipedia revision
+    
+    Parameters:
+    - title: Wikipedia page title
+    - revision_id: Revision ID
+    
+    Returns:
+    - URL to the revision
+    """
+    # Replace spaces with underscores for the URL
+    title_formatted = title.replace(" ", "_")
+    
+    # Create the URL
+    url = f"https://en.wikipedia.org/w/index.php?title={title_formatted}&oldid={revision_id}"
+    
+    return url
 
 # Set up Streamlit page
 st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
@@ -967,7 +984,9 @@ if wiki_page:
                                         
                                         header_html = f'''
                                         <div class="year-header">
-                                            {display_date}
+                                            <a href="{get_revision_url(wiki_page, data["revid"])}" target="_blank" style="text-decoration: none; color: inherit;">
+                                                {display_date} <span style="font-size: 0.7em; color: #6b7280;">↗</span>
+                                            </a>
                                             <div class="significance-indicator" title="Significance: {significance_value}/10">
                                                 <span style="color: #9333ea; letter-spacing: -1px;">{significance_indicator}</span>
                                             </div>
@@ -976,10 +995,12 @@ if wiki_page:
                                             </div>
                                         </div>
                                         '''
+                                        
                                         st.markdown(header_html, unsafe_allow_html=True)
                                     else:
                                         # Original yearly view
-                                        st.markdown(f'<div class="year-header">{key}</div>', unsafe_allow_html=True)
+                                        # Add hyperlink to year header
+                                        st.markdown(f'<div class="year-header"><a href="{get_revision_url(wiki_page, data["revid"])}" target="_blank" style="text-decoration: none; color: inherit;">{key} <span style="font-size: 0.7em; color: #6b7280;">↗</span></a></div>', unsafe_allow_html=True)
                                         
                                     # Display sections
                                     for section in data["sections"]:
@@ -1180,6 +1201,25 @@ if wiki_page:
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
+
+                            # Add CSS for the year links
+                            st.markdown("""
+                            <style>
+                                .year-link {
+                                    text-decoration: none;
+                                    color: inherit;
+                                    display: block;
+                                }
+                                .year-link:hover {
+                                    color: #2563eb;
+                                }
+                                .external-icon {
+                                    font-size: 0.7em;
+                                    color: #6b7280;
+                                    margin-left: 2px;
+                                }
+                            </style>
+                            """, unsafe_allow_html=True)
                             
                             # Add rename chain styles
                             st.markdown("""
@@ -1267,9 +1307,17 @@ if wiki_page:
                                             <th style="text-align: left;">Level</th>
                             """
                             
-                            # Add year columns
+                            # Add year columns with links to revisions
                             for year in years:
-                                table_html += f'<th>{year}</th>'
+                                # Find the revision ID for this year
+                                revision_id = None
+                                if year in toc_history:
+                                    revision_id = toc_history[year].get("revid")
+                                
+                                if revision_id:
+                                    table_html += f'<th><a href="{get_revision_url(wiki_page, revision_id)}" target="_blank" class="year-link">{year}<span class="external-icon">↗</span></a></th>'
+                                else:
+                                    table_html += f'<th>{year}</th>'
                             
                             table_html += """
                                             <th style="text-align: left;">Lifespan</th>

@@ -260,7 +260,7 @@ def calculate_toc_change_significance(current_sections, previous_sections):
         # Add this except block to handle any errors
         return 5, f"Error calculating significance: {str(e)}"
 
-def process_revision_history(title, mode="yearly", significance_threshold=5):
+def process_revision_history(title, mode="yearly", significance_threshold=5, start_year=2010, end_year=None):
     """
     Process revision history and extract TOC
     
@@ -268,8 +268,14 @@ def process_revision_history(title, mode="yearly", significance_threshold=5):
     - title: Wikipedia page title
     - mode: "yearly" for one revision per year, "significant" for significant changes
     - significance_threshold: threshold for significant changes (1-10 scale)
+    - start_year: filter revisions from this year onwards (inclusive)
+    - end_year: filter revisions up to this year (inclusive), None means current year
     """
     revisions = get_page_history(title)
+    
+    # Handle end_year=None by setting it to current year
+    if end_year is None:
+        end_year = datetime.now().year
     
     # Dictionary to store revisions by key (year or revision id)
     toc_revisions = {}
@@ -286,8 +292,8 @@ def process_revision_history(title, mode="yearly", significance_threshold=5):
         year = date.year
         revision_id = rev['revid']
         
-        # Skip years before 2019
-        if year < 2019:
+        # Filter by year range
+        if year < start_year or year > end_year:
             continue
             
         # For yearly mode, skip if we already have this year
@@ -549,7 +555,6 @@ st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 st.title("Wikipedia Table of Contents History Viewer")
 st.write("This tool shows how the table of contents structure has evolved over time")
 
-# Input section
 with st.sidebar:
     st.header("Settings")
     wiki_page = st.text_input(
@@ -557,6 +562,33 @@ with st.sidebar:
         "Opioid-induced hyperalgesia",
         help="Enter the exact title as it appears in the Wikipedia URL"
     )
+    
+    # Year range selector
+    st.subheader("Time Range")
+    
+    # Set default min and max years
+    min_year_default = 2010
+    max_year_default = datetime.now().year
+    
+    # Create year range selection with min and max sliders
+    col1, col2 = st.columns(2)
+    with col1:
+        start_year = st.number_input("Start Year", 
+                                    min_value=1990, 
+                                    max_value=max_year_default,
+                                    value=min_year_default,
+                                    step=1)
+    with col2:
+        end_year = st.number_input("End Year", 
+                                   min_value=1990, 
+                                   max_value=max_year_default + 1,
+                                   value=max_year_default,
+                                   step=1)
+    
+    # Ensure start_year <= end_year
+    if start_year > end_year:
+        st.warning("Start year cannot be after end year. Adjusting end year.")
+        end_year = start_year
     
     # First define the view mode
     view_mode = st.radio(
@@ -640,10 +672,16 @@ if wiki_page:
                     wiki_page, 
                     mode=toc_mode,
                     significance_threshold=significance_value
+                    start_year=start_year,
+                    end_year=end_year
                 )
                 
                 if toc_history:
-                    st.success(f"Found historical versions from {len(toc_history)} different years")
+                    years_count = len([k for k in toc_history.keys() if k != "_metadata"])
+                    if years_count > 0:
+                        st.success(f"Found {years_count} historical versions from {start_year} to {end_year}")
+                    else:
+                        st.warning(f"No historical versions found in the selected time range ({start_year} - {end_year}). Try expanding your time range.")
                     
                     rename_summary = []
                     for year, data in sorted(toc_history.items()):

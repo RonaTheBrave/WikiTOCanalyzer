@@ -878,6 +878,27 @@ if wiki_page:
                                 border-radius: 3px;
                                 height: 18px; /* Fixed height for all indicators */
                             }
+                            
+                            .section-title {
+                                display: inline-block;
+                                vertical-align: middle; /* Align text vertically */
+                                line-height: 1.2; /* Improve text line height */
+                                padding: 2px 4px;
+                                border-radius: 4px;
+                                max-width: 100%;
+                                box-sizing: border-box;
+                            }
+                            
+                            .section-container {
+                                position: relative;
+                                padding: 6px 4px 6px 24px; /* Increased vertical padding */
+                                margin: 2px 0;
+                                overflow: hidden;
+                                width: 100%;
+                                box-sizing: border-box;
+                                display: flex;
+                                align-items: center; /* Center align content vertically */
+                            }
                             .level-1-line { background-color: #3b82f6; left: 4px; }
                             .level-2-line { background-color: #60a5fa; left: 8px; }
                             .level-3-line { background-color: #93c5fd; left: 12px; }

@@ -867,21 +867,22 @@ if wiki_page:
                                 max-width: 100%;
                                 box-sizing: border-box;
                             }
+
                             /* Level indicator styles */
-                            .level-indicator {
-                                position: absolute; 
-                                left: 4px;
-                                top: 50%;
-                                transform: translateY(-50%);
-                                border-radius: 50%;
-                                display: inline-block;
-                                z-index: 2;
+                            .level-line {
+                                position: absolute;
+                                left: 0;
+                                top: 0;
+                                bottom: 0;
+                                width: 3px;
+                                border-radius: 3px;
                             }
-                            .level-1 { background-color: rgba(59, 130, 246, 0.9); width: 6px; height: 6px; }
-                            .level-2 { background-color: rgba(59, 130, 246, 0.7); width: 5px; height: 5px; }
-                            .level-3 { background-color: rgba(59, 130, 246, 0.5); width: 4px; height: 4px; }
-                            .level-4 { background-color: rgba(59, 130, 246, 0.3); width: 3px; height: 3px; }
-                            .level-5 { background-color: rgba(59, 130, 246, 0.2); width: 2px; height: 2px; }
+                            .level-1-line { background-color: #3b82f6; left: 4px; height: 100%; }
+                            .level-2-line { background-color: #60a5fa; left: 8px; height: 100%; }
+                            .level-3-line { background-color: #93c5fd; left: 12px; height: 100%; }
+                            .level-4-line { background-color: #bfdbfe; left: 16px; height: 100%; }
+                            .level-5-line { background-color: #dbeafe; left: 20px; height: 100%; }
+                            
                             .section-title:hover {
                                 background-color: #f3f4f6;
                                 white-space: normal;
@@ -1033,7 +1034,7 @@ if wiki_page:
                                             previous_title = section.get("previousTitle", "Unknown")
                                             st.markdown(f"""
                                                 <div class="section-container">
-                                                    <div class="level-indicator level-{section["level"]}"></div>
+                                                    {"".join([f'<div class="level-line level-{i}-line"></div>' for i in range(1, section["level"]+1)])}
                                                     {indent}<span class="section-title {class_str} tooltip">
                                                         {section["title"]}
                                                         <span class="rename-indicator">↺</span>
@@ -1044,7 +1045,7 @@ if wiki_page:
                                         else:
                                             st.markdown(f"""
                                                 <div class="section-container">
-                                                    <div class="level-indicator level-{section["level"]}"></div>
+                                                    {"".join([f'<div class="level-line level-{i}-line"></div>' for i in range(1, section["level"]+1)])}
                                                     {indent}<span class="section-title {class_str}">
                                                         {section["title"]}
                                                     </span>
@@ -1056,7 +1057,7 @@ if wiki_page:
                                         for removed_section in data["removed"]:
                                             st.markdown(f"""
                                                 <div class="section-container">
-                                                    <div class="level-indicator" style="background-color: rgba(220, 38, 38, 0.7); width: 6px; height: 6px;"></div>
+                                                    <div class="level-line level-1-line" style="background-color: #ef4444;"></div>
                                                     <span class="section-title" style="background-color: #fee2e2;">
                                                         {removed_section}
                                                     </span>

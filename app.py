@@ -872,16 +872,17 @@ if wiki_page:
                             .level-line {
                                 position: absolute;
                                 left: 0;
-                                top: 0;
-                                bottom: 0;
+                                top: 50%;
+                                transform: translateY(-50%);
                                 width: 3px;
                                 border-radius: 3px;
+                                height: 18px; /* Fixed height for all indicators */
                             }
-                            .level-1-line { background-color: #3b82f6; left: 4px; height: 100%; }
-                            .level-2-line { background-color: #60a5fa; left: 8px; height: 100%; }
-                            .level-3-line { background-color: #93c5fd; left: 12px; height: 100%; }
-                            .level-4-line { background-color: #bfdbfe; left: 16px; height: 100%; }
-                            .level-5-line { background-color: #dbeafe; left: 20px; height: 100%; }
+                            .level-1-line { background-color: #3b82f6; left: 4px; }
+                            .level-2-line { background-color: #60a5fa; left: 8px; }
+                            .level-3-line { background-color: #93c5fd; left: 12px; }
+                            .level-4-line { background-color: #bfdbfe; left: 16px; }
+                            .level-5-line { background-color: #dbeafe; left: 20px; }
                             
                             .section-title:hover {
                                 background-color: #f3f4f6;

@@ -422,7 +422,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     """
     section_edits = {}
     section_first_seen = {}
-    section_last_seen = {}  # Only new variable we're adding
     rename_history = {}  # Track rename history
 
     # Process revisions in chronological order
@@ -436,7 +435,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
             
             # Update edit counts and track renames
             for section in sections:
-                title = section["title"]  # Keep original variable name
+                title = section["title"]
                 level = "*" * section["level"]
                 
                 # Check if this is a renamed section
@@ -452,9 +451,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                             section_edits[title]["section"] = title
                             section_first_seen[title] = section_first_seen[old_title]
                         del section_edits[old_title]
-                        # Only change: also update section_last_seen when deleting old section
-                        if old_title in section_last_seen:
-                            del section_last_seen[old_title]
                 
                 # Initialize or update section data
                 if title not in section_edits:
@@ -468,9 +464,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                     }
                     section_first_seen[title] = year_str
                 
-                # Only change: update last seen date
-                section_last_seen[title] = year_str
-                
                 # Increment edit count for this year
                 if year_str not in section_edits[title]["edits"]:
                     section_edits[title]["edits"][year_str] = 0
@@ -481,15 +474,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     formatted_data = []
     for title, data in section_edits.items():
         first_year = data["first_seen"]
-        
-        # Only change: calculate proper lifespan
-        last_year = section_last_seen.get(title)
-        latest_year = max(section_last_seen.values()) if section_last_seen else "present"
-        
-        if last_year == latest_year:
-            lifespan = f"{first_year}-present"
-        else:
-            lifespan = f"{first_year}-{last_year}"
+        lifespan = f"{first_year}-present"
         
         formatted_data.append({
             "section": title,

@@ -1265,10 +1265,27 @@ if wiki_page:
                                         z-index: 5;
                                         text-align: left;
                                         left: 0;
-                                        max-width: 200px;
+                                        min-width: 250px;
+                                        max-width: 300px;
                                         overflow: hidden;
                                         text-overflow: ellipsis;
                                         white-space: nowrap;
+                                        cursor: default;
+                                    }
+                                    .edit-table td:first-child:hover::after {
+                                        content: attr(data-full-title);
+                                        position: absolute;
+                                        left: 0;
+                                        top: 100%;
+                                        background-color: #333;
+                                        color: white;
+                                        padding: 5px 8px;
+                                        border-radius: 4px;
+                                        z-index: 30;
+                                        white-space: normal;
+                                        max-width: 400px;
+                                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                                        font-size: 14px;
                                     }
                                     .edit-table tr:nth-child(odd) td:first-child {
                                         background-color: #f9fafb;

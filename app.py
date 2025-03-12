@@ -415,7 +415,7 @@ def create_section_count_chart(toc_history):
     
     return fig
 
-def calculate_edit_activity(revisions, title):
+def calculate_edit_activity(revisions, title, toc_history=None):
     """
     Calculate edit activity for each section across years
     Returns: Dictionary mapping sections to their edit history

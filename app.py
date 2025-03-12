@@ -1194,8 +1194,7 @@ if wiki_page:
                                     }
                                     .edit-table {
                                         width: 100%;
-                                        border-collapse: separate;
-                                        border-spacing: 0;
+                                        border-collapse: collapse;
                                     }
                                     .edit-table th, .edit-table td {
                                         padding: 8px;
@@ -1227,21 +1226,6 @@ if wiki_page:
                                         white-space: nowrap;
                                         cursor: default;
                                     }
-                                    .edit-table td:first-child:hover::after {
-                                        content: attr(data-full-title);
-                                        position: absolute;
-                                        left: 0;
-                                        top: 100%;
-                                        background-color: #333;
-                                        color: white;
-                                        padding: 5px 8px;
-                                        border-radius: 4px;
-                                        z-index: 30;
-                                        white-space: normal;
-                                        max-width: 400px;
-                                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                                        font-size: 14px;
-                                    }
                                     .edit-table tr:nth-child(odd) td:first-child {
                                         background-color: #f9fafb;
                                     }
@@ -1250,8 +1234,17 @@ if wiki_page:
                                         padding: 4px 8px;
                                         white-space: nowrap;
                                     }
+                                    /* Add special styling for renamed sections */
+                                    .section-row.renamed {
+                                        display: table-row;
+                                        border-bottom: 2px solid #e9d5ff;
+                                    }
+                                    .section-row.renamed td {
+                                        background-color: #fcf6ff;
+                                    }
                                 </style>
                             """, unsafe_allow_html=True)
+                            
                             # Add CSS for the year links
                             st.markdown("""
                             <style>

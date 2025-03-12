@@ -422,6 +422,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     """
     section_edits = {}
     section_first_seen = {}
+    section_last_seen = {}  # Add this to track when sections were last seen
     rename_history = {}  # Track rename history
     
     # First extract all renames from toc_history to ensure we have a complete picture
@@ -441,6 +442,8 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         content = get_revision_content(title, rev['revid'])
         if content:
             sections = extract_toc(content)
+            # Track current sections to later identify removed ones
+            current_sections = {section["title"] for section in sections}
             
             # Update edit counts and track renames
             for section in sections:
@@ -464,6 +467,8 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                             section_edits[title] = section_edits[old_title].copy()
                             section_edits[title]["section"] = title
                             section_first_seen[title] = section_first_seen[old_title]
+                        if old_title in section_last_seen:
+                            del section_last_seen[old_title]  # Remove old title from last_seen
                         del section_edits[old_title]
                 
                 # Initialize or update section data
@@ -481,17 +486,28 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                     # Ensure rename history is updated
                     section_edits[title]["rename_history"] = rename_history.get(title, [])
                 
+                # Update the last seen year for this section
+                section_last_seen[title] = year_str
+                
                 # Increment edit count for this year
                 if year_str not in section_edits[title]["edits"]:
                     section_edits[title]["edits"][year_str] = 0
                 section_edits[title]["edits"][year_str] += 1
                 section_edits[title]["totalEdits"] += 1
 
-    # Format data for visualization with rename info
+    # Format data for visualization with rename info and proper lifespan
     formatted_data = []
+    latest_year = max(section_last_seen.values()) if section_last_seen else "present"
+    
     for title, data in section_edits.items():
         first_year = data["first_seen"]
-        lifespan = f"{first_year}-present"
+        last_year = section_last_seen.get(title)
+        
+        # If the section is still present in the latest revision, mark it as "present"
+        if last_year == latest_year:
+            lifespan = f"{first_year}-present"
+        else:
+            lifespan = f"{first_year}-{last_year}"
         
         formatted_data.append({
             "section": title,

@@ -1223,22 +1223,64 @@ if wiki_page:
                             # Create table
                             st.markdown("""
                                 <style>
+                                    .edit-table-container {
+                                        position: relative;
+                                        overflow: auto;
+                                        max-height: 80vh;
+                                        max-width: 100%;
+                                    }
                                     .edit-table {
                                         width: 100%;
-                                        border-collapse: collapse;
+                                        border-collapse: separate;
+                                        border-spacing: 0;
                                     }
                                     .edit-table th, .edit-table td {
                                         padding: 8px;
                                         text-align: center;
                                         border: 1px solid #e5e7eb;
+                                        min-width: 80px;
                                     }
                                     .edit-table th {
                                         background-color: #f9fafb;
                                         font-weight: 500;
+                                        position: sticky;
+                                        top: 0;
+                                        z-index: 10;
+                                    }
+                                    .edit-table th:first-child,
+                                    .edit-table th:nth-child(2) {
+                                        left: 0;
+                                        z-index: 20;
+                                    }
+                                    .edit-table th:nth-child(2) {
+                                        left: 216px;
+                                    }
+                                    .edit-table td:first-child,
+                                    .edit-table td:nth-child(2) {
+                                        position: sticky;
+                                        background-color: #ffffff;
+                                        z-index: 5;
+                                    }
+                                    .edit-table td:first-child {
+                                        text-align: left;
+                                        left: 0;
+                                        max-width: 200px;
+                                        overflow: hidden;
+                                        text-overflow: ellipsis;
+                                        white-space: nowrap;
+                                    }
+                                    .edit-table td:nth-child(2) {
+                                        left: 216px;
+                                        text-align: left;
+                                    }
+                                    .edit-table tr:nth-child(odd) td:first-child,
+                                    .edit-table tr:nth-child(odd) td:nth-child(2) {
+                                        background-color: #f9fafb;
                                     }
                                     .edit-cell {
                                         border-radius: 4px;
                                         padding: 4px 8px;
+                                        white-space: nowrap;
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
@@ -1340,7 +1382,7 @@ if wiki_page:
                             """, unsafe_allow_html=True)
                             
                             table_html = """
-                                <div style="overflow-x: auto;">
+                                <div class="edit-table-container">
                                 <table class="edit-table">
                                     <thead>
                                         <tr>

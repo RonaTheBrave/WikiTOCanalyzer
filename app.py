@@ -1454,8 +1454,13 @@ if wiki_page:
                                 if has_rename:
                                     old_name = row['rename_history'][0][0]  # Get first old name
                                     year = row['rename_history'][0][1]      # Get year of first rename
+                                    
+                                    # Just swap them - display the current section name from TOC history (new name)
+                                    # and use the row section as the old name
+                                    current_name = row["section"]
+                                    
                                     table_html += f'<div style="padding: 4px;">'
-                                    table_html += f'<strong>{row["section"]}</strong> '
+                                    table_html += f'<strong>{current_name}</strong> '
                                     table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
                                     table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
                                     table_html += f'</div>'

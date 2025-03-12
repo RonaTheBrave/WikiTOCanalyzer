@@ -415,52 +415,17 @@ def create_section_count_chart(toc_history):
     
     return fig
 
-def calculate_edit_activity(revisions, title, toc_history=None):
+def calculate_edit_activity(revisions, title):
     """
-    Calculate edit activity for each section across years with improved case handling
+    Calculate edit activity for each section across years
     Returns: Dictionary mapping sections to their edit history
     """
     section_edits = {}
     section_first_seen = {}
+    section_last_seen = {}  # Track when sections were last seen
     rename_history = {}  # Track rename history
+    all_section_titles = set()  # Track all section titles we've seen
     
-    # Dictionary for case-insensitive handling (maps lowercase section titles to actual titles)
-    case_map = {}
-
-    # Build rename history from toc_history if provided - with detailed debug
-    if toc_history:
-        print("Building rename history from TOC data")
-        rename_found = False
-        
-        # Debug the toc_history structure
-        print(f"TOC history contains {len(toc_history)} years")
-        for year, data in sorted(toc_history.items()):
-            has_renamed = "renamed" in data and len(data["renamed"]) > 0
-            print(f"Year {year}: Has 'renamed' key: {'renamed' in data}, Has renames: {has_renamed}")
-            if has_renamed:
-                print(f"  Found {len(data['renamed'])} renames in year {year}")
-                rename_found = True
-        
-        if not rename_found:
-            print("WARNING: No renames found in TOC history")
-            
-        # Now try to build the rename history
-        for year, data in sorted(toc_history.items()):
-            if "renamed" in data and data["renamed"]:
-                for new_name, old_name in data["renamed"].items():
-                    print(f"Processing rename: '{old_name}' → '{new_name}' from year {year}")
-                    
-                    # Check if the keys are properly accessible
-                    new_key = new_name.lower()
-                    print(f"  Using lowercase new key: '{new_key}'")
-                    
-                    if new_key not in rename_history:
-                        rename_history[new_key] = []
-                        print(f"  Created new rename history entry for '{new_key}'")
-                    
-                    rename_history[new_key].append((old_name, year))
-                    print(f"  Added rename: '{old_name}' → '{new_name}' for year {year}")
-
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -469,75 +434,79 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         content = get_revision_content(title, rev['revid'])
         if content:
             sections = extract_toc(content)
+            current_sections = set()  # Track sections in this revision
             
             # Update edit counts and track renames
             for section in sections:
                 section_title = section["title"]
                 level = "*" * section["level"]
-                
-                # Case-insensitive key for lookups
-                section_key = section_title.lower()
-                
-                # Update case map with the current capitalization
-                case_map[section_key] = section_title
+                current_sections.add(section_title)  # Add to current sections
                 
                 # Check if this is a renamed section
                 if section.get("isRenamed"):
                     old_title = section["previousTitle"]
-                    old_key = old_title.lower()
-                    
                     # Update rename history
-                    if section_key not in rename_history:
-                        rename_history[section_key] = [(old_title, year_str)]
-                    
-                    # Transfer data from old section to new (case-insensitive)
-                    if old_key in section_edits:
-                        if section_key not in section_edits:
-                            section_edits[section_key] = section_edits[old_key].copy()
-                            section_edits[section_key]["section"] = section_title  # Use current capitalization
-                            section_first_seen[section_key] = section_first_seen.get(old_key, year_str)
-                        del section_edits[old_key]
+                    if section_title not in rename_history:
+                        rename_history[section_title] = [(old_title, year_str)]
+                    # Transfer data from old section to new
+                    if old_title in section_edits:
+                        if section_title not in section_edits:
+                            section_edits[section_title] = section_edits[old_title].copy()
+                            section_edits[section_title]["section"] = section_title
+                            section_first_seen[section_title] = section_first_seen[old_title]
+                        del section_edits[old_title]
+                        if old_title in all_section_titles:
+                            all_section_titles.remove(old_title)
+                        if old_title in section_last_seen:
+                            del section_last_seen[old_title]
+                
+                # Add to all sections we've seen
+                all_section_titles.add(section_title)
                 
                 # Initialize or update section data
-                if section_key not in section_edits:
-                    has_rename = section_key in rename_history and len(rename_history[section_key]) > 0
-                    section_edits[section_key] = {
-                        "section": section_title,  # Use original capitalization
+                if section_title not in section_edits:
+                    section_edits[section_title] = {
+                        "section": section_title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(section_key, []),
-                        "has_rename": has_rename
+                        "rename_history": rename_history.get(section_title, [])
                     }
-                    section_first_seen[section_key] = year_str
-                    
-                    # Debug output for sections with rename history
-                    if has_rename:
-                        print(f"Section '{section_title}' has rename history: {rename_history[section_key]}")
-                else:
-                    # Update the capitalization to the most recent one
-                    section_edits[section_key]["section"] = section_title
-                    
-                    # Make sure rename history is set even for existing sections
-                    if section_key in rename_history and len(rename_history[section_key]) > 0:
-                        section_edits[section_key]["rename_history"] = rename_history[section_key]
-                        section_edits[section_key]["has_rename"] = True
+                    section_first_seen[section_title] = year_str
+                
+                # Update last seen date for this section
+                section_last_seen[section_title] = year_str
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[section_key]["edits"]:
-                    section_edits[section_key]["edits"][year_str] = 0
-                section_edits[section_key]["edits"][year_str] += 1
-                section_edits[section_key]["totalEdits"] += 1
-
-    # Format data for visualization
+                if year_str not in section_edits[section_title]["edits"]:
+                    section_edits[section_title]["edits"][year_str] = 0
+                section_edits[section_title]["edits"][year_str] += 1
+                section_edits[section_title]["totalEdits"] += 1
+            
+            # Check for sections that were removed in this revision
+            for old_section in all_section_titles - current_sections:
+                if old_section not in section_last_seen:
+                    continue
+                if year_str >= section_last_seen[old_section]:
+                    continue
+                # We don't need to update anything here as last_seen is already correct
+            
+    # Format data for visualization with proper lifespan
     formatted_data = []
-    for key, data in section_edits.items():
+    for title, data in section_edits.items():
         first_year = data["first_seen"]
-        lifespan = f"{first_year}-present"
+        last_year = section_last_seen.get(title)
+        
+        # If the section is still present in the latest revision, mark it as "present"
+        latest_revision_year = max(section_last_seen.values()) if section_last_seen else "present"
+        if last_year == latest_revision_year:
+            lifespan = f"{first_year}-present"
+        else:
+            lifespan = f"{first_year}-{last_year}"
         
         formatted_data.append({
-            "section": data["section"],  # Use the most recent capitalization
+            "section": title,
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,
@@ -545,7 +514,8 @@ def calculate_edit_activity(revisions, title, toc_history=None):
             "rename_history": data.get("rename_history", [])
         })
 
-    return sorted(formatted_data, key=lambda x: x['section'].lower())  # Sort by lowercase name for consistency
+    return sorted(formatted_data, key=lambda x: x['section'])
+
 
 def get_revision_url(title, revision_id):
     """

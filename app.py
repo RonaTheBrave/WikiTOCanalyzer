@@ -1247,21 +1247,14 @@ if wiki_page:
                                         top: 0;
                                         z-index: 10;
                                     }
-                                    .edit-table th:first-child,
-                                    .edit-table th:nth-child(2) {
+                                    .edit-table th:first-child {
                                         left: 0;
                                         z-index: 20;
                                     }
-                                    .edit-table th:nth-child(2) {
-                                        left: 216px;
-                                    }
-                                    .edit-table td:first-child,
-                                    .edit-table td:nth-child(2) {
+                                    .edit-table td:first-child {
                                         position: sticky;
                                         background-color: #ffffff;
                                         z-index: 5;
-                                    }
-                                    .edit-table td:first-child {
                                         text-align: left;
                                         left: 0;
                                         max-width: 200px;
@@ -1269,12 +1262,7 @@ if wiki_page:
                                         text-overflow: ellipsis;
                                         white-space: nowrap;
                                     }
-                                    .edit-table td:nth-child(2) {
-                                        left: 216px;
-                                        text-align: left;
-                                    }
-                                    .edit-table tr:nth-child(odd) td:first-child,
-                                    .edit-table tr:nth-child(odd) td:nth-child(2) {
+                                    .edit-table tr:nth-child(odd) td:first-child {
                                         background-color: #f9fafb;
                                     }
                                     .edit-cell {
@@ -1284,7 +1272,6 @@ if wiki_page:
                                     }
                                 </style>
                             """, unsafe_allow_html=True)
-
                             # Add CSS for the year links
                             st.markdown("""
                             <style>

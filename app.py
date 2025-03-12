@@ -422,25 +422,9 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     """
     section_edits = {}
     section_first_seen = {}
-    section_last_seen = {}  # Track when sections were last seen
+    section_last_seen = {}  # New: Track when sections were last seen
     rename_history = {}  # Track rename history
-    all_section_titles = set()  # Track all section titles we've seen
-    renamed_mapping = {}  # Keep track of section title mappings for renames
-    
-    # First, build a complete mapping of all renames across all years
-    # This helps ensure consistent handling of renamed sections
-    if toc_history:
-        for year, data in toc_history.items():
-            if year != "_metadata" and "renamed" in data:
-                for new_title, old_title in data["renamed"].items():
-                    # Build a chain of renames: old_title -> new_title
-                    if old_title in renamed_mapping:
-                        # This old title was itself a new name in a previous rename
-                        # So we need to follow the chain back to the original
-                        renamed_mapping[new_title] = renamed_mapping[old_title]
-                    else:
-                        renamed_mapping[new_title] = old_title
-    
+
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -449,13 +433,11 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         content = get_revision_content(title, rev['revid'])
         if content:
             sections = extract_toc(content)
-            current_sections = set()  # Track sections in this revision
             
             # Update edit counts and track renames
             for section in sections:
-                section_title = section["title"]
+                section_title = section["title"]  # Changed variable name to avoid confusion
                 level = "*" * section["level"]
-                current_sections.add(section_title)  # Add to current sections
                 
                 # Check if this is a renamed section
                 if section.get("isRenamed"):
@@ -463,87 +445,54 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                     # Update rename history
                     if section_title not in rename_history:
                         rename_history[section_title] = [(old_title, year_str)]
-                    else:
-                        # Check if this old_title is already in the history to avoid duplicates
-                        if not any(old == old_title for old, _ in rename_history[section_title]):
-                            rename_history[section_title].append((old_title, year_str))
-                    
                     # Transfer data from old section to new
                     if old_title in section_edits:
                         if section_title not in section_edits:
-                            # Copy old section data to new section
                             section_edits[section_title] = section_edits[old_title].copy()
                             section_edits[section_title]["section"] = section_title
                             section_first_seen[section_title] = section_first_seen[old_title]
-                            
-                            # Make sure edits are transferred properly
-                            for edit_year, count in section_edits[old_title]["edits"].items():
-                                if edit_year not in section_edits[section_title]["edits"]:
-                                    section_edits[section_title]["edits"][edit_year] = count
-                        else:
-                            # If new section already exists, merge the edit history
-                            for edit_year, count in section_edits[old_title]["edits"].items():
-                                if edit_year not in section_edits[section_title]["edits"]:
-                                    section_edits[section_title]["edits"][edit_year] = count
-                                else:
-                                    section_edits[section_title]["edits"][edit_year] += count
-                            
-                            # Update total edits count
-                            section_edits[section_title]["totalEdits"] += section_edits[old_title]["totalEdits"]
-                            
-                            # Update first seen date if older
-                            if section_first_seen[old_title] < section_first_seen[section_title]:
-                                section_first_seen[section_title] = section_first_seen[old_title]
-                        
-                        # Remove old section after transferring data
                         del section_edits[old_title]
-                        if old_title in all_section_titles:
-                            all_section_titles.remove(old_title)
+                        # New: Also delete from last_seen if present
                         if old_title in section_last_seen:
                             del section_last_seen[old_title]
                 
-                # Add to all sections we've seen
-                all_section_titles.add(section_title)
-                
-                # Check if we need to use a canonical title due to renames
-                canonical_title = section_title
-                
                 # Initialize or update section data
-                if canonical_title not in section_edits:
-                    section_edits[canonical_title] = {
-                        "section": canonical_title,
+                if section_title not in section_edits:
+                    section_edits[section_title] = {
+                        "section": section_title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(canonical_title, [])
+                        "rename_history": rename_history.get(section_title, [])
                     }
-                    section_first_seen[canonical_title] = year_str
+                    section_first_seen[section_title] = year_str
                 
-                # Update last seen date for this section
-                section_last_seen[canonical_title] = year_str
+                # New: Update last seen date for this section
+                section_last_seen[section_title] = year_str
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[canonical_title]["edits"]:
-                    section_edits[canonical_title]["edits"][year_str] = 0
-                section_edits[canonical_title]["edits"][year_str] += 1
-                section_edits[canonical_title]["totalEdits"] += 1
-    
+                if year_str not in section_edits[section_title]["edits"]:
+                    section_edits[section_title]["edits"][year_str] = 0
+                section_edits[section_title]["edits"][year_str] += 1
+                section_edits[section_title]["totalEdits"] += 1
+
     # Format data for visualization with proper lifespan
     formatted_data = []
-    for title, data in section_edits.items():
+    latest_year = max(section_last_seen.values()) if section_last_seen else "present"
+    
+    for section_title, data in section_edits.items():
         first_year = data["first_seen"]
-        last_year = section_last_seen.get(title)
+        last_year = section_last_seen.get(section_title)
         
         # If the section is still present in the latest revision, mark it as "present"
-        latest_revision_year = max(section_last_seen.values()) if section_last_seen else "present"
-        if last_year == latest_revision_year:
+        if last_year == latest_year:
             lifespan = f"{first_year}-present"
         else:
             lifespan = f"{first_year}-{last_year}"
         
         formatted_data.append({
-            "section": title,
+            "section": section_title,
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,

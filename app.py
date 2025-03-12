@@ -423,7 +423,16 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     section_edits = {}
     section_first_seen = {}
     rename_history = {}  # Track rename history
-
+    
+    # First extract all renames from toc_history to ensure we have a complete picture
+    if toc_history:
+        for year, data in toc_history.items():
+            if year != "_metadata" and "renamed" in data:
+                for new_name, old_name in data["renamed"].items():
+                    if new_name not in rename_history:
+                        rename_history[new_name] = []
+                    rename_history[new_name].append((old_name, year))
+    
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
         year = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ").year
@@ -444,6 +453,11 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                     # Update rename history
                     if title not in rename_history:
                         rename_history[title] = [(old_title, year_str)]
+                    else:
+                        # Check if this rename is already recorded
+                        if not any(old_name == old_title for old_name, _ in rename_history[title]):
+                            rename_history[title].append((old_title, year_str))
+                            
                     # Transfer data from old section to new
                     if old_title in section_edits:
                         if title not in section_edits:
@@ -463,6 +477,9 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                         "rename_history": rename_history.get(title, [])
                     }
                     section_first_seen[title] = year_str
+                else:
+                    # Ensure rename history is updated
+                    section_edits[title]["rename_history"] = rename_history.get(title, [])
                 
                 # Increment edit count for this year
                 if year_str not in section_edits[title]["edits"]:
@@ -482,7 +499,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
             "edits": data["edits"],
             "lifespan": lifespan,
             "totalEdits": data["totalEdits"],
-            "rename_history": data.get("rename_history", [])
+            "rename_history": rename_history.get(title, [])  # Ensure we get the latest rename history
         })
 
     return sorted(formatted_data, key=lambda x: x['section'])

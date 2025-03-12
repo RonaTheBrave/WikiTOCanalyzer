@@ -1139,10 +1139,18 @@ if wiki_page:
                         if not edit_data:
                             st.warning("No edit activity data found.")
                         else:
-                            # Get all years from the data FIRST
+                            # Get all years from the data
                             all_years = set()
                             for item in edit_data:
                                 all_years.update(item["edits"].keys())
+                                
+                            # Get the full range of years (fill in any missing years)
+                            if all_years:
+                                min_year = min(int(year) for year in all_years)
+                                max_year = max(int(year) for year in all_years)
+                                # Ensure all years in the range are included
+                                all_years = set(str(year) for year in range(min_year, max_year + 1))
+                                
                             years = sorted(list(all_years))
 
                             # Then add controls row

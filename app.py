@@ -1425,8 +1425,19 @@ if wiki_page:
                                         current_year_data = toc_history[year]
                                         section_titles = {s["title"].lower() for s in current_year_data["sections"]}
                                         
+                                        # Account for renamed sections in existence check
+                                        current_section = row['section'].lower()
+                                        
+                                        # If this section has rename history, check for old names too
+                                        if row.get('rename_history'):
+                                            for old_name, rename_year in row['rename_history']:
+                                                if int(rename_year) > int(year):  # If the rename happened after this year
+                                                    # For earlier years, use old name instead
+                                                    current_section = old_name.lower()
+                                                    break
+                                        
                                         # If section doesn't exist in this year's TOC and it's after first appearance
-                                        if row['section'].lower() not in section_titles and year > first_year:
+                                        if current_section not in section_titles and year > first_year:
                                             section_exists = False
                                     
                                     if not section_exists:

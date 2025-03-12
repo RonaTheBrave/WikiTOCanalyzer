@@ -1060,6 +1060,51 @@ if wiki_page:
                             st.write(f"Total renames detected: {rename_count}")
                             
                         edit_data = calculate_edit_activity(revisions, wiki_page, toc_history)
+
+                        if edit_data:
+                            # Post-process edit_data to combine sections with the same titles (case-insensitive)
+                            title_mapping = {}
+                            for i, row in enumerate(edit_data):
+                                lower_title = row['section'].lower()
+                                if lower_title not in title_mapping:
+                                    title_mapping[lower_title] = i
+                                else:
+                                    # Found duplicate section - merge them
+                                    primary_idx = title_mapping[lower_title]
+                                    primary_row = edit_data[primary_idx]
+                                    
+                                    # Merge edits
+                                    for year, count in row['edits'].items():
+                                        if year not in primary_row['edits']:
+                                            primary_row['edits'][year] = count
+                                        else:
+                                            primary_row['edits'][year] += count
+                                    
+                                    # Update total edits
+                                    primary_row['totalEdits'] += row['totalEdits']
+                                    
+                                    # Merge rename history if any
+                                    if row.get('rename_history'):
+                                        if not primary_row.get('rename_history'):
+                                            primary_row['rename_history'] = []
+                                        for rename_entry in row['rename_history']:
+                                            if rename_entry not in primary_row['rename_history']:
+                                                primary_row['rename_history'].append(rename_entry)
+                                    
+                                    # Update lifespan if needed
+                                    first_year_primary = primary_row['lifespan'].split('-')[0]
+                                    first_year_current = row['lifespan'].split('-')[0]
+                                    
+                                    if first_year_current < first_year_primary:
+                                        if '-present' in primary_row['lifespan']:
+                                            primary_row['lifespan'] = f"{first_year_current}-present"
+                                        else:
+                                            last_year = primary_row['lifespan'].split('-')[1]
+                                            primary_row['lifespan'] = f"{first_year_current}-{last_year}"
+                            
+                            # Filter out merged rows
+                            unique_indices = set(title_mapping.values())
+                            edit_data = [edit_data[i] for i in range(len(edit_data)) if i in unique_indices]
                         
                         # Debug: Check for rename history in edit_data
                         with st.expander("DEBUG: Edit Data Rename Info"):

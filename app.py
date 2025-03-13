@@ -1263,22 +1263,6 @@ if wiki_page:
                             elif sort_by == "First Appearance":
                                 edit_data = sorted(edit_data, key=lambda x: x['lifespan'].split('-')[0])
 
-                            # Add this right before the table html generation in the Edit Activity section
-                            with st.expander("Section Name Debug"):
-                                st.write("### Section names as they appear in edit_data")
-                                for row in edit_data:
-                                    if "Mechanism" in row['section']:
-                                        st.write(f"Section name: '{row['section']}'")
-                                        st.write(f"Rename history: {row.get('rename_history', [])}")
-                                        
-                                        # Also look at toc_history
-                                        st.write("### Related entries in toc_history")
-                                        for year, data in toc_history.items():
-                                            if year != "_metadata" and "renamed" in data:
-                                                for new_name, old_name in data["renamed"].items():
-                                                    if "Mechanism" in new_name or "Mechanism" in old_name:
-                                                        st.write(f"In {year}: '{old_name}' → '{new_name}'")
-
                             # Create table
                             st.markdown("""
                                 <style>

@@ -472,6 +472,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                             del section_last_seen[old_title]  # Remove old title from last_seen
                         del section_edits[old_title]
                 
+                
                 # Initialize or update section data
                 if title not in section_edits:
                     section_edits[title] = {
@@ -480,12 +481,14 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(title, [])
+                        "rename_history": []  # Initialize as empty list
                     }
                     section_first_seen[title] = year_str
-                else:
-                    # Ensure rename history is updated
-                    section_edits[title]["rename_history"] = rename_history.get(title, [])
+                    
+                # Always update rename history to ensure it's current
+                if title in rename_history:
+                    section_edits[title]["rename_history"] = rename_history[title]
+
                 
                 # Update the last seen year for this section
                 section_last_seen[title] = year_str
@@ -510,13 +513,25 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         else:
             lifespan = f"{first_year}-{last_year}"
         
+        # Ensure rename_history is properly set and sorted by year
+        rename_history_list = data.get("rename_history", [])
+        if title in rename_history:
+            # Make sure we're not duplicating entries
+            existing_renames = {old_name for old_name, _ in rename_history_list}
+            for old_name, year in rename_history[title]:
+                if old_name not in existing_renames:
+                    rename_history_list.append((old_name, year))
+                    
+        # Sort rename history by year (newest first)
+        rename_history_list = sorted(rename_history_list, key=lambda x: x[1], reverse=True)
+        
         formatted_data.append({
             "section": title,
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,
             "totalEdits": data["totalEdits"],
-            "rename_history": rename_history.get(title, [])  # Ensure we get the latest rename history
+            "rename_history": rename_history_list
         })
 
     return sorted(formatted_data, key=lambda x: x['section'])
@@ -1306,6 +1321,26 @@ if wiki_page:
                                     .section-row.renamed td {
                                         background-color: #fcf6ff;
                                     }
+                                    .section-row.renamed:hover td {
+                                        background-color: #f3e8ff;
+                                    }
+                                    .renamed-badge {
+                                        display: inline-block;
+                                        background-color: #e9d5ff;
+                                        color: #6b21a8;
+                                        font-weight: bold;
+                                        padding: 2px 6px;
+                                        border-radius: 4px;
+                                        font-size: 0.75rem;
+                                        margin-left: 4px;
+                                    }
+                                    .rename-history {
+                                        font-size: 0.8rem;
+                                        color: #6b21a8;
+                                        margin-top: 2px;
+                                        padding-left: 4px;
+                                        border-left: 2px solid #e9d5ff;
+                                    }
                                 </style>
                             """, unsafe_allow_html=True)
                             
@@ -1438,26 +1473,26 @@ if wiki_page:
                             # Add data rows
                             for row in edit_data:
                                 
-                                # Simple rename indicator without complex history
-                                rename_info = ""
+                                # Check if section has rename history
                                 has_rename = row.get('rename_history') and len(row.get('rename_history', [])) > 0
                                 
-                                # Simplified row with clear cell background for renamed sections
-                                table_html += f'<tr class="section-row">'
+                                # Add appropriate CSS class for renamed sections
+                                row_class = "section-row renamed" if has_rename else "section-row"
+                                table_html += f'<tr class="{row_class}">'
                                 
-                                # Simple background color for renamed sections
+                                # Cell style for section name
                                 cell_bg = "#fcf6ff" if has_rename else ""
                                 cell_style = f'background-color: {cell_bg};' if has_rename else ""
                                 
                                 table_html += f'<td style="text-align: left; {cell_style}">'
                                 
-                                # Make renamed sections stand out with a badge
+                                # Display section name with rename badge and history if applicable
                                 if has_rename:
-                                    old_name = row['rename_history'][0][0]  # Get first old name
-                                    year = row['rename_history'][0][1]      # Get year of first rename
+                                    # Sort rename history by year (newest first) to ensure consistency
+                                    sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
+                                    old_name = sorted_history[0][0]  # Get most recent old name
+                                    year = sorted_history[0][1]      # Get year of most recent rename
                                     
-                                    # Just swap them - display the current section name from TOC history (new name)
-                                    # and use the row section as the old name
                                     current_name = row["section"]
                                     
                                     table_html += f'<div style="padding: 4px;">'

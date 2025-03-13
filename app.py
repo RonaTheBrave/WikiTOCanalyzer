@@ -454,22 +454,27 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                 # Check if this is a renamed section
                 if section.get("isRenamed"):
                     old_title = section["previousTitle"]
-                    # Update rename history
-                    if title not in rename_history:
-                        rename_history[title] = [(old_title, year_str)]
+                    new_title = section_title  # This is the current (new) title
+                    
+                    # Update rename history for the NEW title (key is the new name)
+                    if new_title not in rename_history:
+                        rename_history[new_title] = [(old_title, year_str)]
                     else:
                         # Check if this rename is already recorded
-                        if not any(old_name == old_title for old_name, _ in rename_history[title]):
-                            rename_history[title].append((old_title, year_str))
+                        if not any(old_name == old_title for old_name, _ in rename_history[new_title]):
+                            rename_history[new_title].append((old_title, year_str))
                             
-                    # Transfer data from old section to new
+                    # Transfer data from old section to new section
                     if old_title in section_edits:
-                        if title not in section_edits:
-                            section_edits[title] = section_edits[old_title].copy()
-                            section_edits[title]["section"] = title
-                            section_first_seen[title] = section_first_seen[old_title]
+                        if new_title not in section_edits:
+                            # Copy old section data to new section
+                            section_edits[new_title] = section_edits[old_title].copy()
+                            section_edits[new_title]["section"] = new_title  # Update section name
+                            section_first_seen[new_title] = section_first_seen.get(old_title, year_str)
+                        
+                        # Clean up old section references
                         if old_title in section_last_seen:
-                            del section_last_seen[old_title]  # Remove old title from last_seen
+                            del section_last_seen[old_title]
                         del section_edits[old_title]
                 
                 
@@ -1469,24 +1474,23 @@ if wiki_page:
                                 
                                 # Make renamed sections stand out with a badge
                                 if has_rename:
-                                    # Make sure we have valid rename history
-                                    if isinstance(row['rename_history'], list) and len(row['rename_history']) > 0:
-                                        # Sort rename history by year (newest first)
-                                        sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
-                                        old_name = sorted_history[0][0]  # Get most recent old name
-                                        year = sorted_history[0][1]      # Get year of most recent rename
-                                    else:
-                                        old_name = "Unknown"
-                                        year = "Unknown"
-                                    
-                                    # The current section name is the new name (after renaming)
+                                    # At this point, 'section' in the row is the CURRENT name (after rename)
                                     current_name = row["section"]
                                     
-                                    table_html += f'<div style="padding: 4px;">'
-                                    table_html += f'<strong>{current_name}</strong> '
-                                    table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
-                                    table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
-                                    table_html += f'</div>'
+                                    # The rename_history contains entries of (old_name, year) pairs
+                                    if row['rename_history'] and len(row['rename_history']) > 0:
+                                        # Get most recent rename (should be first in the list)
+                                        old_name = row['rename_history'][0][0]
+                                        year = row['rename_history'][0][1]
+                                        
+                                        table_html += f'<div style="padding: 4px;">'
+                                        table_html += f'<strong>{current_name}</strong> '
+                                        table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
+                                        table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
+                                        table_html += f'</div>'
+                                    else:
+                                        # Fallback in case rename_history is empty
+                                        table_html += f'<strong>{current_name}</strong> <span style="background-color: #e9d5ff; color: #6b21a8; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
                                 else:
                                     table_html += f'{row["section"]}'
                                 

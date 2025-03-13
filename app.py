@@ -1321,26 +1321,6 @@ if wiki_page:
                                     .section-row.renamed td {
                                         background-color: #fcf6ff;
                                     }
-                                    .section-row.renamed:hover td {
-                                        background-color: #f3e8ff;
-                                    }
-                                    .renamed-badge {
-                                        display: inline-block;
-                                        background-color: #e9d5ff;
-                                        color: #6b21a8;
-                                        font-weight: bold;
-                                        padding: 2px 6px;
-                                        border-radius: 4px;
-                                        font-size: 0.75rem;
-                                        margin-left: 4px;
-                                    }
-                                    .rename-history {
-                                        font-size: 0.8rem;
-                                        color: #6b21a8;
-                                        margin-top: 2px;
-                                        padding-left: 4px;
-                                        border-left: 2px solid #e9d5ff;
-                                    }
                                 </style>
                             """, unsafe_allow_html=True)
                             
@@ -1486,13 +1466,20 @@ if wiki_page:
                                 
                                 table_html += f'<td style="text-align: left; {cell_style}">'
                                 
-                                # Display section name with rename badge and history if applicable
+                                
+                                # Make renamed sections stand out with a badge
                                 if has_rename:
-                                    # Sort rename history by year (newest first) to ensure consistency
-                                    sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
-                                    old_name = sorted_history[0][0]  # Get most recent old name
-                                    year = sorted_history[0][1]      # Get year of most recent rename
+                                    # Make sure we have valid rename history
+                                    if isinstance(row['rename_history'], list) and len(row['rename_history']) > 0:
+                                        # Sort rename history by year (newest first)
+                                        sorted_history = sorted(row['rename_history'], key=lambda x: x[1], reverse=True)
+                                        old_name = sorted_history[0][0]  # Get most recent old name
+                                        year = sorted_history[0][1]      # Get year of most recent rename
+                                    else:
+                                        old_name = "Unknown"
+                                        year = "Unknown"
                                     
+                                    # The current section name is the new name (after renaming)
                                     current_name = row["section"]
                                     
                                     table_html += f'<div style="padding: 4px;">'

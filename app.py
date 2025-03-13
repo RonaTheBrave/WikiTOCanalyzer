@@ -427,19 +427,17 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     
     # First extract all renames from toc_history to ensure we have a complete picture
     if toc_history:
+        rename_history = {}  # Clear any existing entries to ensure clean data
         for year, data in toc_history.items():
             if year != "_metadata" and "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
-                    # Make sure we're using the exact names from TOC history
-                    exact_new_name = new_name
-                    exact_old_name = old_name
-                    
-                    # Store it with the new name as the key
-                    if exact_new_name not in rename_history:
-                        rename_history[exact_new_name] = []
+                    # Store it with the new name as the key (this is correct as per TOC history format)
+                    if new_name not in rename_history:
+                        rename_history[new_name] = []
                     # Only add if not already present
-                    if not any(name == exact_old_name for name, _ in rename_history.get(exact_new_name, [])):
-                        rename_history[exact_new_name].append((exact_old_name, year))
+                    if not any(name == old_name for name, _ in rename_history.get(new_name, [])):
+                        rename_history[new_name].append((old_name, year))
+                        print(f"DEBUG: Found rename in TOC history: '{old_name}' → '{new_name}' in {year}")
     
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -511,17 +509,11 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         else:
             lifespan = f"{first_year}-{last_year}"
         
-        # Ensure rename_history is properly set and sorted by year
-        rename_history_list = data.get("rename_history", [])
+        # Get the rename history directly from the main rename_history dictionary
+        # - This is the source of truth for rename data
+        rename_history_list = []
         if title in rename_history:
-            # Make sure we're not duplicating entries
-            existing_renames = {old_name for old_name, _ in rename_history_list}
-            for old_name, year in rename_history[title]:
-                if old_name not in existing_renames:
-                    rename_history_list.append((old_name, year))
-                    
-        # Sort rename history by year (newest first)
-        rename_history_list = sorted(rename_history_list, key=lambda x: x[1], reverse=True)
+            rename_history_list = rename_history[title].copy()  # Use direct copy without extra processing
         
         formatted_data.append({
             "section": title,
@@ -1467,7 +1459,7 @@ if wiki_page:
                                 
                                 # Make renamed sections stand out with a badge
                                 if has_rename:
-                                    # Get the current section name from the row data
+                                    # Get the current section name from the row data (this is the new name after rename)
                                     current_name = row["section"]
                                     
                                     # Display badge and name
@@ -1475,11 +1467,9 @@ if wiki_page:
                                     table_html += f'<strong>{current_name}</strong> '
                                     table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
                                     
-                                    # Display rename history if available
-                                    if isinstance(row['rename_history'], list) and len(row['rename_history']) > 0:
-                                        # Sort by year (newest first) to ensure consistent display
-                                        sorted_history = sorted(row['rename_history'], key=lambda x: x[1] if isinstance(x, tuple) and len(x) > 1 else "0", reverse=True)
-                                        for old_name, year in sorted_history:
+                                    # Display rename history if available - use directly without sorting or processing
+                                    if row.get('rename_history') and len(row['rename_history']) > 0:
+                                        for old_name, year in row['rename_history']:
                                             table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
                                     
                                     table_html += f'</div>'

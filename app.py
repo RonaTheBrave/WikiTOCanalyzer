@@ -5,6 +5,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 
+def get_section_key(section_name):
+    """
+    Create a consistent key for section names to handle case sensitivity
+    """
+    return section_name.lower() if section_name else ""
+    
+
 def get_revision_content(title, revid=None):
     """
     Fetch content of a specific revision or current version of a Wikipedia page
@@ -427,17 +434,20 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     
     # First extract all renames from toc_history to ensure we have a complete picture
     if toc_history:
-        rename_history = {}  # Clear any existing entries to ensure clean data
+        rename_history = {}  # Start fresh to avoid any confusion
+        print("\nDEBUG: Extracting renames from TOC history:")
+        
         for year, data in toc_history.items():
             if year != "_metadata" and "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
-                    # Store it with the new name as the key (this is correct as per TOC history format)
+                    # Store with exact names from TOC history
                     if new_name not in rename_history:
                         rename_history[new_name] = []
-                    # Only add if not already present
-                    if not any(name == old_name for name, _ in rename_history.get(new_name, [])):
+                    
+                    # Check if this rename is already recorded (case-sensitive)
+                    if not any(old == old_name for old, _ in rename_history[new_name]):
                         rename_history[new_name].append((old_name, year))
-                        print(f"DEBUG: Found rename in TOC history: '{old_name}' → '{new_name}' in {year}")
+                        print(f"DEBUG: Extracted rename: '{old_name}' → '{new_name}' in {year}")
     
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -459,9 +469,10 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                 renamed_to = None
                 for potential_new_name, history in rename_history.items():
                     for old_name, rename_year in history:
-                        # If this section matches any old name and the current year is >= rename year
-                        if section_title == old_name and int(year_str) >= int(rename_year):
+                        # If this section matches any old name (case-insensitive) and the current year is >= rename year
+                        if section_title.lower() == old_name.lower() and int(year_str) >= int(rename_year):
                             renamed_to = potential_new_name
+                            print(f"DEBUG: Found section '{section_title}' matching old name '{old_name}' → '{potential_new_name}'")
                             break
                     if renamed_to:
                         break
@@ -1495,16 +1506,23 @@ if wiki_page:
                                         current_year_data = toc_history[year]
                                         section_titles = {s["title"].lower() for s in current_year_data["sections"]}
                                         
-                                        # Account for renamed sections in existence check
-                                        current_section = row['section'].lower()
+                                        # Account for renamed sections in existence check - use exact case from the data
+                                        current_section = row['section']
+                                        current_section_key = current_section.lower()  # For case-insensitive comparison
                                         
                                         # If this section has rename history, check for old names too
                                         if row.get('rename_history'):
                                             for old_name, rename_year in row['rename_history']:
                                                 if int(rename_year) > int(year):  # If the rename happened after this year
                                                     # For earlier years, use old name instead
-                                                    current_section = old_name.lower()
+                                                    current_section = old_name
+                                                    current_section_key = old_name.lower()
                                                     break
+                                        
+                                        # When checking if section exists in TOC, use case-insensitive comparison
+                                        section_titles_lower = {s["title"].lower() for s in current_year_data["sections"]}
+                                        if current_section_key not in section_titles_lower and year > first_year:
+                                            section_exists = False
                                         
                                         # If section doesn't exist in this year's TOC and it's after first appearance
                                         if current_section not in section_titles and year > first_year:

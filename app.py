@@ -430,6 +430,7 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         for year, data in toc_history.items():
             if year != "_metadata" and "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
+                    # Store it with the new name as the key
                     if new_name not in rename_history:
                         rename_history[new_name] = []
                     rename_history[new_name].append((old_name, year))

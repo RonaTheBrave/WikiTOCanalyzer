@@ -465,14 +465,18 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                 section_title = section["title"]  # Use different variable name to avoid confusion
                 level = "*" * section["level"]
                 
-                # First, check if this section's title is in our rename dictionary
                 renamed_to = None
                 for potential_new_name, history in rename_history.items():
                     for old_name, rename_year in history:
                         # If this section matches any old name (case-insensitive) and the current year is >= rename year
                         if section_title.lower() == old_name.lower() and int(year_str) >= int(rename_year):
-                            renamed_to = potential_new_name
-                            print(f"DEBUG: Found section '{section_title}' matching old name '{old_name}' → '{potential_new_name}'")
+                            # If this is a case-only change, use the CURRENT section title instead of historical rename
+                            if section_title.lower() == potential_new_name.lower():
+                                renamed_to = section_title  # Preserve CURRENT case for case-only changes
+                            else:
+                                renamed_to = potential_new_name  # Use historical new name for substantial renames
+                                
+                            print(f"DEBUG: Found section '{section_title}' matching old name '{old_name}' → '{renamed_to}'")
                             break
                     if renamed_to:
                         break

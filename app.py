@@ -7,7 +7,7 @@ import requests
 
 def get_section_key(section_name):
     """
-    Create a consistent key for section names to handle case sensitivity
+    Create a consistent key for section names to handle case sensitivity.
     """
     return section_name.lower() if section_name else ""
     

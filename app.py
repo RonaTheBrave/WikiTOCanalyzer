@@ -561,9 +561,9 @@ def get_revision_url(title, revision_id):
     return url
 
 # Set up Streamlit page
-st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
+st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide") #tab title
 
-st.title("Wikipedia Table of Contents History Viewer")
+st.title("Wikipedia TOC Viewer") #title seen on page
 st.write("This tool shows how the table of contents structure has evolved over time")
 
 with st.sidebar:

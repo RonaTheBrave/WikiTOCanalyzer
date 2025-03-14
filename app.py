@@ -1321,11 +1321,8 @@ if wiki_page:
                                     /* Add special styling for renamed sections */
                                     .section-row.renamed {
                                         display: table-row;
-                                        border-bottom: 2px solid #e9d5ff;
                                     }
-                                    .section-row.renamed td {
-                                        background-color: #fcf6ff;
-                                    }
+                                
                                 </style>
                             """, unsafe_allow_html=True)
                             
@@ -1480,12 +1477,12 @@ if wiki_page:
                                     # Display badge and name
                                     table_html += f'<div style="padding: 4px;">'
                                     table_html += f'<strong>{current_name}</strong> '
-                                    table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
+                                    table_html += f'<span style="display: inline-block; background-color: #f5f3ff; color: #7e22ce; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-left: 4px;">renamed</span>'
                                     
                                     # Display rename history if available - use directly without sorting or processing
                                     if row.get('rename_history') and len(row['rename_history']) > 0:
                                         for old_name, year in row['rename_history']:
-                                            table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
+                                            table_html += f'<div style="font-size: 0.75rem; color: #8b5cf6; margin-top: 2px; opacity: 0.8;">Previously: {old_name} ({year})</div>'
                                     
                                     table_html += f'</div>'
                                 else:

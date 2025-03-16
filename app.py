@@ -5,13 +5,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 
-def get_section_key(section_name):
-    """
-    Create a consistent key for section names to handle case sensitivity.
-    """
-    return section_name.lower() if section_name else ""
-    
-
 def get_revision_content(title, revid=None):
     """
     Fetch content of a specific revision or current version of a Wikipedia page
@@ -434,20 +427,13 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     
     # First extract all renames from toc_history to ensure we have a complete picture
     if toc_history:
-        rename_history = {}  # Start fresh to avoid any confusion
-        print("\nDEBUG: Extracting renames from TOC history:")
-        
         for year, data in toc_history.items():
             if year != "_metadata" and "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
-                    # Store with exact names from TOC history
+                    # Store it with the new name as the key
                     if new_name not in rename_history:
                         rename_history[new_name] = []
-                    
-                    # Check if this rename is already recorded (case-sensitive)
-                    if not any(old == old_name for old, _ in rename_history[new_name]):
-                        rename_history[new_name].append((old_name, year))
-                        print(f"DEBUG: Extracted rename: '{old_name}' → '{new_name}' in {year}")
+                    rename_history[new_name].append((old_name, year))
     
     # Process revisions in chronological order
     for rev in reversed(revisions):  # Reversed to match Timeline view's order
@@ -462,53 +448,53 @@ def calculate_edit_activity(revisions, title, toc_history=None):
             
             # Update edit counts and track renames
             for section in sections:
-                section_title = section["title"]  # Use different variable name to avoid confusion
+                title = section["title"]
                 level = "*" * section["level"]
                 
-                renamed_to = None
-                for potential_new_name, history in rename_history.items():
-                    for old_name, rename_year in history:
-                        # If this section matches any old name (case-insensitive) and the current year is >= rename year
-                        if section_title.lower() == old_name.lower() and int(year_str) >= int(rename_year):
-                            # If this is a case-only change, use the CURRENT section title instead of historical rename
-                            if section_title.lower() == potential_new_name.lower():
-                                renamed_to = section_title  # Preserve CURRENT case for case-only changes
-                            else:
-                                renamed_to = potential_new_name  # Use historical new name for substantial renames
-                                
-                            print(f"DEBUG: Found section '{section_title}' matching old name '{old_name}' → '{renamed_to}'")
-                            break
-                    if renamed_to:
-                        break
-                        
-                # If this section will be renamed in the future, use the current name
-                # If it was already renamed in the past, use the new name
-                actual_title = renamed_to if renamed_to else section_title
+                # Check if this is a renamed section
+                if section.get("isRenamed"):
+                    old_title = section["previousTitle"]
+                    # Update rename history
+                    if title not in rename_history:
+                        rename_history[title] = [(old_title, year_str)]
+                    else:
+                        # Check if this rename is already recorded
+                        if not any(old_name == old_title for old_name, _ in rename_history[title]):
+                            rename_history[title].append((old_title, year_str))
+                            
+                    # Transfer data from old section to new
+                    if old_title in section_edits:
+                        if title not in section_edits:
+                            section_edits[title] = section_edits[old_title].copy()
+                            section_edits[title]["section"] = title
+                            section_first_seen[title] = section_first_seen[old_title]
+                        if old_title in section_last_seen:
+                            del section_last_seen[old_title]  # Remove old title from last_seen
+                        del section_edits[old_title]
                 
-                # Initialize section data with the correct title (current or future)
-                if actual_title not in section_edits:
-                    section_edits[actual_title] = {
-                        "section": actual_title,  # Use actual title (may be the renamed version)
+                # Initialize or update section data
+                if title not in section_edits:
+                    section_edits[title] = {
+                        "section": title,
                         "level": level,
                         "edits": {},
                         "totalEdits": 0,
                         "first_seen": year_str,
-                        "rename_history": rename_history.get(actual_title, [])
+                        "rename_history": rename_history.get(title, [])
                     }
-                    section_first_seen[actual_title] = year_str
+                    section_first_seen[title] = year_str
+                else:
+                    # Ensure rename history is updated
+                    section_edits[title]["rename_history"] = rename_history.get(title, [])
                 
-                # Always update rename history
-                if actual_title in rename_history:
-                    section_edits[actual_title]["rename_history"] = rename_history[actual_title]
-                    
-                # Update last seen year
-                section_last_seen[actual_title] = year_str
+                # Update the last seen year for this section
+                section_last_seen[title] = year_str
                 
                 # Increment edit count for this year
-                if year_str not in section_edits[actual_title]["edits"]:
-                    section_edits[actual_title]["edits"][year_str] = 0
-                section_edits[actual_title]["edits"][year_str] += 1
-                section_edits[actual_title]["totalEdits"] += 1
+                if year_str not in section_edits[title]["edits"]:
+                    section_edits[title]["edits"][year_str] = 0
+                section_edits[title]["edits"][year_str] += 1
+                section_edits[title]["totalEdits"] += 1
 
     # Format data for visualization with rename info and proper lifespan
     formatted_data = []
@@ -524,19 +510,13 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         else:
             lifespan = f"{first_year}-{last_year}"
         
-        # Get the rename history directly from the main rename_history dictionary
-        # - This is the source of truth for rename data
-        rename_history_list = []
-        if title in rename_history:
-            rename_history_list = rename_history[title].copy()  # Use direct copy without extra processing
-        
         formatted_data.append({
             "section": title,
             "level": data["level"],
             "edits": data["edits"],
             "lifespan": lifespan,
             "totalEdits": data["totalEdits"],
-            "rename_history": rename_history_list
+            "rename_history": rename_history.get(title, [])  # Ensure we get the latest rename history
         })
 
     return sorted(formatted_data, key=lambda x: x['section'])
@@ -561,9 +541,9 @@ def get_revision_url(title, revision_id):
     return url
 
 # Set up Streamlit page
-st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide") #tab title
+st.set_page_config(page_title="Wikipedia TOC History Viewer", layout="wide")
 
-st.title("Wikipedia TOC Viewer") #title seen on page
+st.title("Wikipedia Table of Contents History Viewer")
 st.write("This tool shows how the table of contents structure has evolved over time")
 
 with st.sidebar:
@@ -1321,8 +1301,11 @@ if wiki_page:
                                     /* Add special styling for renamed sections */
                                     .section-row.renamed {
                                         display: table-row;
+                                        border-bottom: 2px solid #e9d5ff;
                                     }
-                                
+                                    .section-row.renamed td {
+                                        background-color: #fcf6ff;
+                                    }
                                 </style>
                             """, unsafe_allow_html=True)
                             
@@ -1455,35 +1438,32 @@ if wiki_page:
                             # Add data rows
                             for row in edit_data:
                                 
-                                # Check if section has rename history
+                                # Simple rename indicator without complex history
+                                rename_info = ""
                                 has_rename = row.get('rename_history') and len(row.get('rename_history', [])) > 0
                                 
-                                # Add appropriate CSS class for renamed sections
-                                row_class = "section-row renamed" if has_rename else "section-row"
-                                table_html += f'<tr class="{row_class}">'
+                                # Simplified row with clear cell background for renamed sections
+                                table_html += f'<tr class="section-row">'
                                 
-                                # Cell style for section name
+                                # Simple background color for renamed sections
                                 cell_bg = "#fcf6ff" if has_rename else ""
                                 cell_style = f'background-color: {cell_bg};' if has_rename else ""
                                 
                                 table_html += f'<td style="text-align: left; {cell_style}">'
                                 
-                                
                                 # Make renamed sections stand out with a badge
                                 if has_rename:
-                                    # Get the current section name from the row data (this is the new name after rename)
+                                    old_name = row['rename_history'][0][0]  # Get first old name
+                                    year = row['rename_history'][0][1]      # Get year of first rename
+                                    
+                                    # Just swap them - display the current section name from TOC history (new name)
+                                    # and use the row section as the old name
                                     current_name = row["section"]
                                     
-                                    # Display badge and name
                                     table_html += f'<div style="padding: 4px;">'
                                     table_html += f'<strong>{current_name}</strong> '
-                                    table_html += f'<span style="display: inline-block; background-color: #f5f3ff; color: #7e22ce; padding: 1px 4px; border-radius: 3px; font-size: 0.7rem; margin-left: 4px;">renamed</span>'
-                                    
-                                    # Display rename history if available - use directly without sorting or processing
-                                    if row.get('rename_history') and len(row['rename_history']) > 0:
-                                        for old_name, year in row['rename_history']:
-                                            table_html += f'<div style="font-size: 0.75rem; color: #8b5cf6; margin-top: 2px; opacity: 0.8;">Previously: {old_name} ({year})</div>'
-                                    
+                                    table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
+                                    table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
                                     table_html += f'</div>'
                                 else:
                                     table_html += f'{row["section"]}'
@@ -1507,23 +1487,16 @@ if wiki_page:
                                         current_year_data = toc_history[year]
                                         section_titles = {s["title"].lower() for s in current_year_data["sections"]}
                                         
-                                        # Account for renamed sections in existence check - use exact case from the data
-                                        current_section = row['section']
-                                        current_section_key = current_section.lower()  # For case-insensitive comparison
+                                        # Account for renamed sections in existence check
+                                        current_section = row['section'].lower()
                                         
                                         # If this section has rename history, check for old names too
                                         if row.get('rename_history'):
                                             for old_name, rename_year in row['rename_history']:
                                                 if int(rename_year) > int(year):  # If the rename happened after this year
                                                     # For earlier years, use old name instead
-                                                    current_section = old_name
-                                                    current_section_key = old_name.lower()
+                                                    current_section = old_name.lower()
                                                     break
-                                        
-                                        # When checking if section exists in TOC, use case-insensitive comparison
-                                        section_titles_lower = {s["title"].lower() for s in current_year_data["sections"]}
-                                        if current_section_key not in section_titles_lower and year > first_year:
-                                            section_exists = False
                                         
                                         # If section doesn't exist in this year's TOC and it's after first appearance
                                         if current_section not in section_titles and year > first_year:

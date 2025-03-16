@@ -266,6 +266,102 @@ def calculate_toc_change_significance(current_sections, previous_sections):
         # Add this except block to handle any errors
         return 5, f"Error calculating significance: {str(e)}"
 
+def select_revisions_for_processing(revisions, start_year, end_year, mode="yearly"):
+    """
+    Intelligently select which revisions to process based on the mode and date range
+    
+    Parameters:
+    - revisions: List of revision data from Wikipedia API
+    - start_year: Start year for filtering
+    - end_year: End year for filtering
+    - mode: "yearly" or "significant"
+    
+    Returns:
+    - List of selected revisions to process
+    """
+    from datetime import datetime
+    
+    selected_revisions = []
+    years_processed = set()
+    
+    # Sort revisions chronologically (oldest first)
+    sorted_revisions = sorted(revisions, key=lambda r: r['timestamp'])
+    
+    if mode == "yearly":
+        # For yearly mode, select one revision per year
+        # Choose the revision closest to the middle of the year for consistency
+        year_revisions = {}
+        
+        for rev in sorted_revisions:
+            date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
+            year = date.year
+            
+            if year < start_year or year > end_year:
+                continue
+                
+            # If we don't have any revision for this year yet, add it
+            if year not in year_revisions:
+                year_revisions[year] = []
+                
+            year_revisions[year].append(rev)
+        
+        # For each year, select the middle revision
+        for year, revs in year_revisions.items():
+            if revs:
+                middle_index = len(revs) // 2
+                selected_revisions.append(revs[middle_index])
+    
+    elif mode == "significant":
+        # For significant mode, we do a pre-filtering to reduce the number of revisions to analyze
+        # More sophisticated selection will happen later when analyzing content
+        
+        # First, select a sample of revisions distributed over time
+        # For large articles, analyzing all revisions would be too slow
+        
+        # Group revisions by year
+        year_revisions = {}
+        for rev in sorted_revisions:
+            date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
+            year = date.year
+            
+            if year < start_year or year > end_year:
+                continue
+                
+            if year not in year_revisions:
+                year_revisions[year] = []
+                
+            year_revisions[year].append(rev)
+        
+        # Select a reasonable number of revisions per year based on activity
+        for year, revs in year_revisions.items():
+            # For years with few revisions, select all
+            if len(revs) <= 4:
+                selected_revisions.extend(revs)
+            # For years with moderate activity, select quarterly
+            elif len(revs) <= 12:
+                indices = [len(revs) // 4 * i for i in range(4)]
+                selected_revisions.extend([revs[i] for i in indices if i < len(revs)])
+            # For years with high activity, select monthly
+            elif len(revs) <= 52:
+                indices = [len(revs) // 12 * i for i in range(12)]
+                selected_revisions.extend([revs[i] for i in indices if i < len(revs)])
+            # For extremely active years, just sample across the year
+            else:
+                num_samples = 24  # Bi-weekly
+                indices = [len(revs) // num_samples * i for i in range(num_samples)]
+                selected_revisions.extend([revs[i] for i in indices if i < len(revs)])
+    
+    else:
+        # If mode is not recognized, just return all revisions in the date range
+        for rev in sorted_revisions:
+            date = datetime.strptime(rev['timestamp'], "%Y-%m-%dT%H:%M:%SZ")
+            year = date.year
+            
+            if year >= start_year and year <= end_year:
+                selected_revisions.append(rev)
+    
+    return selected_revisions
+
 def process_revision_history(title, mode="yearly", significance_threshold=5, start_year=2010, end_year=None):
     """
     Process revision history and extract TOC
@@ -283,6 +379,13 @@ def process_revision_history(title, mode="yearly", significance_threshold=5, sta
     if end_year is None:
         end_year = datetime.now().year
     
+    st.write(f"Found {len(revisions)} total revisions. Selecting relevant revisions...")
+    
+    # Use the smart selection strategy to filter revisions
+    selected_revisions = select_revisions_for_processing(revisions, start_year, end_year, mode)
+    
+    st.write(f"Selected {len(selected_revisions)} revisions for analysis.")
+    
     # Dictionary to store revisions by key (year or revision id)
     toc_revisions = {}
     years_processed = set()
@@ -292,20 +395,13 @@ def process_revision_history(title, mode="yearly", significance_threshold=5, sta
     # Track all significant revisions with timestamps
     significant_revisions = []
     
-    for rev in reversed(revisions):
+    # Process the selected revisions
+    for rev in selected_revisions:
         timestamp = rev['timestamp']
         date = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
         year = date.year
         revision_id = rev['revid']
         
-        # Filter by year range
-        if year < start_year or year > end_year:
-            continue
-            
-        # For yearly mode, skip if we already have this year
-        if mode == "yearly" and year in years_processed:
-            continue
-            
         # Get content and extract TOC
         content = get_revision_content(title, revision_id)
         if not content:

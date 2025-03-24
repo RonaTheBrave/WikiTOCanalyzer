@@ -422,7 +422,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
     """
     section_edits = {}
     section_first_seen = {}
-    section_last_seen = {}  # Add this to track when sections were last seen
     rename_history = {}  # Track rename history
     
     # First extract all renames from toc_history to ensure we have a complete picture
@@ -430,7 +429,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         for year, data in toc_history.items():
             if year != "_metadata" and "renamed" in data:
                 for new_name, old_name in data["renamed"].items():
-                    # Store it with the new name as the key
                     if new_name not in rename_history:
                         rename_history[new_name] = []
                     rename_history[new_name].append((old_name, year))
@@ -443,8 +441,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
         content = get_revision_content(title, rev['revid'])
         if content:
             sections = extract_toc(content)
-            # Track current sections to later identify removed ones
-            current_sections = {section["title"] for section in sections}
             
             # Update edit counts and track renames
             for section in sections:
@@ -468,8 +464,6 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                             section_edits[title] = section_edits[old_title].copy()
                             section_edits[title]["section"] = title
                             section_first_seen[title] = section_first_seen[old_title]
-                        if old_title in section_last_seen:
-                            del section_last_seen[old_title]  # Remove old title from last_seen
                         del section_edits[old_title]
                 
                 # Initialize or update section data
@@ -487,28 +481,17 @@ def calculate_edit_activity(revisions, title, toc_history=None):
                     # Ensure rename history is updated
                     section_edits[title]["rename_history"] = rename_history.get(title, [])
                 
-                # Update the last seen year for this section
-                section_last_seen[title] = year_str
-                
                 # Increment edit count for this year
                 if year_str not in section_edits[title]["edits"]:
                     section_edits[title]["edits"][year_str] = 0
                 section_edits[title]["edits"][year_str] += 1
                 section_edits[title]["totalEdits"] += 1
 
-    # Format data for visualization with rename info and proper lifespan
+    # Format data for visualization with rename info
     formatted_data = []
-    latest_year = max(section_last_seen.values()) if section_last_seen else "present"
-    
     for title, data in section_edits.items():
         first_year = data["first_seen"]
-        last_year = section_last_seen.get(title)
-        
-        # If the section is still present in the latest revision, mark it as "present"
-        if last_year == latest_year:
-            lifespan = f"{first_year}-present"
-        else:
-            lifespan = f"{first_year}-{last_year}"
+        lifespan = f"{first_year}-present"
         
         formatted_data.append({
             "section": title,
@@ -1455,13 +1438,8 @@ if wiki_page:
                                 if has_rename:
                                     old_name = row['rename_history'][0][0]  # Get first old name
                                     year = row['rename_history'][0][1]      # Get year of first rename
-                                    
-                                    # Just swap them - display the current section name from TOC history (new name)
-                                    # and use the row section as the old name
-                                    current_name = row["section"]
-                                    
                                     table_html += f'<div style="padding: 4px;">'
-                                    table_html += f'<strong>{current_name}</strong> '
+                                    table_html += f'<strong>{row["section"]}</strong> '
                                     table_html += f'<span style="display: inline-block; background-color: #e9d5ff; color: #6b21a8; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 4px;">renamed</span>'
                                     table_html += f'<div style="font-size: 0.8rem; color: #6b21a8; margin-top: 2px;">Previously: {old_name} ({year})</div>'
                                     table_html += f'</div>'
